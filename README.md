@@ -22,5 +22,6 @@ conda create -n ionic python=3.10.13
 - [ ] GNOME availability
 
 ## Resources
-- [Amorpous diffusivity](https://contribs.materialsproject.org/projects/amorphous_diffusivity)
+- [Amorpous diffusivity](https://contribs.materialsproject.org/projects/amorphous_diffusivity);
+  - [data in csv](https://drive.google.com/file/d/1KZn4WD3NLvlD1lr4PGvCBqZ80Syk5Vzr/view?usp=sharing)
 - [MP contribs download](https://docs.materialsproject.org/downloading-data/query-and-download-contributed-data)
