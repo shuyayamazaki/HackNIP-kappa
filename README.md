@@ -19,7 +19,8 @@ conda create -n ionic python=3.10.13
 -------------------
 ## TODO
 - [ ] Preprocessing pipeline
-- [ ] 
+- [ ] GNOME availability
 
 ## Resources
-- Amorpous diffusivity https://contribs.materialsproject.org/projects/amorphous_diffusivity
+- [Amorpous diffusivity](https://contribs.materialsproject.org/projects/amorphous_diffusivity)
+- [MP contribs download](https://docs.materialsproject.org/downloading-data/query-and-download-contributed-data)
