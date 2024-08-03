@@ -1,5 +1,8 @@
 # ion_conductivity   
-**Purpose:** Develop a ionic conductivity prediction model
+**Purpose:** Develop a ionic conductivity prediction model $\rightarrow$ Predict amorphous structure from crystalline structure, temperatrue
+
+## Introduction
+Li ion battery의 conversion cathode 에서 amourphous구조는 crystalline보다 reversibility가 좋을 수도 있다.
 
 
 -----------
@@ -18,8 +21,23 @@ conda create -n ionic python=3.10.13
 
 -------------------
 ## TODO
-- [ ] Preprocessing pipeline
-- [ ] GNOME availability
+- [x] Preprocessing pipeline
+- [x] PFP 사용해도 좋음 (Prof.Li)
+- [x] PFP로 Diffusivity 계산 (4.5h)
+- [ ] PFP로 non-stoichiometric한 ionic conductivity계산이 맞는지
+- [ ] amorphous구조 하나 만드는데 얼마나 걸리는지 (200~400/day)
+- [ ] 입력 amorphous 대신 crystalline 넣어서 예측
+- [ ] crystalline CIF만들어서 column 따로 추가
+- [ ] 있는 거로 diffusion먼저
+
+## Logic
+### Purpose
+서로다른 구조에 대해 예측
+
+### Construct unlabled dataset
+- Li ion conductivity 로 제한 (MP에서) (<10k)
+- Non-stoichiometric 으로 확장
+
 
 ## Resources
 - [Amorpous diffusivity](https://contribs.materialsproject.org/projects/amorphous_diffusivity);
