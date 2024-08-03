@@ -27,7 +27,7 @@ conda create -n ionic python=3.10.13
 - [ ] PFP로 non-stoichiometric한 ionic conductivity계산이 맞는지
 - [ ] amorphous구조 하나 만드는데 얼마나 걸리는지 (200~400/day)
 - [ ] 입력 amorphous 대신 crystalline 넣어서 예측
-- [ ] crystalline CIF만들어서 column 따로 추가
+- [x] crystalline CIF만들어서 column 따로 추가 (링크는 아래 Resources/Amorphous diffusivity/data with crystalline structures in csv)
 - [ ] 있는 거로 diffusion먼저
 
 ## Logic
@@ -45,6 +45,7 @@ conda create -n ionic python=3.10.13
 ## Resources
 - [Amorpous diffusivity](https://contribs.materialsproject.org/projects/amorphous_diffusivity);
   - [data in csv](https://drive.google.com/file/d/1KZn4WD3NLvlD1lr4PGvCBqZ80Syk5Vzr/view?usp=sharing)
+  - [data with crystalline structures in csv](https://drive.google.com/file/d/1-2YsXG4ezZaHTZsnm3l2swgVw0LO7kDI/view?usp=sharing)
 - [MP contribs download](https://docs.materialsproject.org/downloading-data/query-and-download-contributed-data)
 - [The ab initio amorphous materials database: Empowering machine learning to decode diffusivity](https://ar5iv.labs.arxiv.org/html/2402.00177)
 - [MACE](https://github.com/ACEsuit/mace?tab=readme-ov-file): 만약에 그냥 신경망 성능이 맘에 안들면 해보는 걸로
