@@ -38,6 +38,9 @@ conda create -n ionic python=3.10.13
 - Li ion conductivity 로 제한 (MP에서) (<10k)
 - Non-stoichiometric 으로 확장
 
+## Diffusion for amorphous
+- Fix adjacency matrix, only denoise coordinates
+
 
 ## Resources
 - [Amorpous diffusivity](https://contribs.materialsproject.org/projects/amorphous_diffusivity);
