@@ -24,8 +24,8 @@ conda create -n ionic python=3.10.13
 - [x] Preprocessing pipeline
 - [x] PFP 사용해도 좋음 (Prof.Li)
 - [x] PFP로 Diffusivity 계산 (4.5h)
-- [ ] PFP로 non-stoichiometric한 ionic conductivity계산이 맞는지
-- [ ] amorphous구조 하나 만드는데 얼마나 걸리는지 (200~400/day)
+- [x] PFP로 non-stoichiometric한 ionic conductivity계산이 맞는지
+- [x] amorphous구조 하나 만드는데 얼마나 걸리는지 (60/day without parallel computing)
 - [ ] 입력 amorphous 대신 crystalline 넣어서 예측
 - [x] crystalline CIF만들어서 column 따로 추가 (링크는 아래 Resources/Amorphous diffusivity/data with crystalline structures in csv)
 - [ ] 있는 거로 diffusion먼저
