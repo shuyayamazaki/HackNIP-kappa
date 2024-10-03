@@ -56,3 +56,4 @@ conda create -n ionic python=3.10.13
 - [MP contribs download](https://docs.materialsproject.org/downloading-data/query-and-download-contributed-data)
 - [The ab initio amorphous materials database: Empowering machine learning to decode diffusivity](https://ar5iv.labs.arxiv.org/html/2402.00177)
 - [MACE](https://github.com/ACEsuit/mace?tab=readme-ov-file): 만약에 그냥 신경망 성능이 맘에 안들면 해보는 걸로
+- [Unlabeled dataset_v1](https://drive.google.com/file/d/1vrLIkNRyoaPQ15QDsCERxqJraSPFLgvU/view?usp=drive_link): Materials Project database에서 Li-containing compounds 중 bandgap > 3 eV 이상인 chemical composition 들의 amorphous structure 
