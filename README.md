@@ -2,20 +2,24 @@
 **Purpose:** Develop a ionic conductivity prediction model $\rightarrow$ Predict amorphous structure from crystalline structure, temperatrue
 
 ## Introduction
-Li ion battery의 conversion cathode 에서 amourphous구조는 crystalline보다 reversibility가 좋을 수도 있다.
-MP에서 Li포함된 개수가 22000
-이들 중 band gap으로 3eV cutoff으로 이온 interaction 하는 애들 거르면 1.5k
-amorphous structure를 PFP로 우선 구함
-각 amorphous구조를 NVT로 파라미터 지정해서 ionic conductivity 계산
-개수가 충분하지 않으니 [SOAP](https://singroup.github.io/dscribe/1.0.x/tutorials/descriptors/soap.html)사용 고려 vs GNN
-현재MPContribut에서는 amorphous crystal 개수가 서로 달라서 어떤 걸 입력으로 쓰는게 좋은지 비교가 어려움
-1.5k 다 완성되면 둘 중 어느게 더 예측에 유리한지 확인
+Li ion battery의 conversion cathode 에서 amourphous구조는 crystalline보다 reversibility가 좋을 수도 있다.   
+MP에서 Li포함된 개수가 22000   
+이들 중 band gap으로 3eV cutoff으로 이온 interaction 하는 애들 거르면 1.5k   
+amorphous structure를 PFP로 우선 구함   
+각 amorphous구조를 NVT로 파라미터 지정해서 ionic conductivity 계산   
+개수가 충분하지 않으니 [SOAP](https://singroup.github.io/dscribe/1.0.x/tutorials/descriptors/soap.html)사용 고려 vs GNN   
+현재MPContribut에서는 amorphous crystal 개수가 서로 달라서 어떤 걸 입력으로 쓰는게 좋은지 비교가 어려움   
+MPContribut에서 RDF, Diffusivity계산했는데 거의 똑같았음. 
+1.5k 다 완성되면 둘 중 어느게 더 예측에 유리한지 확인   
 
 -----------
 ## Installation
 ```
 conda create -n ionic python=3.10.13
+pip install ase pymatgen
+
 ```
+
 ## Pipeline
 - Preprocessing: Datasource $\rightarrow$ data_save
   - 데이터 전처리 후 POSCAR로 디렉토리에 저장
