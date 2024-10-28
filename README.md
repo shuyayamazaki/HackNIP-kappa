@@ -6,10 +6,12 @@ Li ion battery의 conversion cathode 에서 amourphous구조는 crystalline보�
 MP에서 Li포함된 개수가 22000   
 이들 중 band gap으로 3eV cutoff으로 이온 interaction 하는 애들 거르면 1.5k   
 amorphous structure를 PFP로 우선 구함   
+계산 도중 오류가 날 때가 있는데 1.5k보다는 적다   
+온도를 5개 찍기 때문에 (1000, 1500, 2000, 2500, 5000) 적어도 5k개....   
 각 amorphous구조를 NVT로 파라미터 지정해서 ionic conductivity 계산   
 개수가 충분하지 않으니 [SOAP](https://singroup.github.io/dscribe/1.0.x/tutorials/descriptors/soap.html)사용 고려 vs GNN   
-현재MPContribut에서는 amorphous crystal 개수가 서로 달라서 어떤 걸 입력으로 쓰는게 좋은지 비교가 어려움   
-MPContribut에서 RDF, Diffusivity계산했는데 거의 똑같았음. 
+현재MPContribut에서는 amorphous crystal 개수가 서로 달라서 결정/비정질 중 어떤 걸 입력으로 쓰는게 좋은지 비교가 어려움   
+MPContribut에서 RDF, Diffusivity계산했는데 거의 똑같았음.   
 1.5k 다 완성되면 둘 중 어느게 더 예측에 유리한지 확인   
 
 -----------
@@ -35,11 +37,13 @@ pip install ase pymatgen
 - [x] PFP 사용해도 좋음 (Prof.Li)
 - [x] PFP로 Diffusivity 계산 (4.5h)
 - [x] PFP로 non-stoichiometric한 ionic conductivity계산이 맞는지
+- [x] arena에서 PFP 사용이 가능하고
 - [x] amorphous구조 하나 만드는데 얼마나 걸리는지 (60/day without parallel computing)
-- [ ] 입력 amorphous 대신 crystalline 넣어서 예측
 - [x] crystalline CIF만들어서 column 따로 추가 (링크는 아래 Resources/Amorphous diffusivity/data with crystalline structures in csv)
+- [ ] MPContrib 중에 MP-ID 없는 애들도 crystal CIF, amorphous CIF 동시에 정리해두기
+- [ ] 입력 amorphous/crystalline 중 어떤게 더 잘 맞는지 평가
+- [ ] SOAP 사용가능 여부 확인 (위에꺼랑 같이 총 4개 실험. 해봤는데 결과가 예측이 잘 안되면 여기서부터 다시시작)
 - [ ] 있는 거로 diffusion먼저
-- [ ] SOAP 사용가능 여부 확인
 
 ## Logic
 ### Purpose
@@ -47,6 +51,7 @@ pip install ase pymatgen
 
 ### Construct unlabled dataset
 - Li ion conductivity 로 제한 (MP에서) (<10k)
+- 
 - Non-stoichiometric 으로 확장
 
 ## Diffusion for amorphous
