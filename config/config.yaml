@@ -1,0 +1,76 @@
+exp_name: CGCNN-ion-conductivity-exp
+debug: False
+seed: 42
+
+dataset: ion-conductivity
+# Data
+data:
+  batch_size: 32
+  data_dir: /home/lucky/Projects/GNN_base/data/li-ion-conductivity  # replace with your data path, except _train.parquet, _test.parquet, _val.parquet
+  num_workers: 12
+  label: y
+  task: regression
+
+# Model
+# resume_from_checkpoint: /home/lucky/Projects/MIT-SES-AI-Data-Driven-Li-Metal-Battery-Residual-Life-Prediction-and-Manufacturing/forecasting/AE/output/SES-ViTAEK-clean-45epochs-deconv/checkpoints/SES-ViTAEK-clean-45epochs-deconv-epoch=01-val_loss=0.00495.ckpt
+model:  
+  name: MACE
+  cgcnn:
+    orig_atom_fea_len: 92
+    nbr_fea_len: 80
+    atom_fea_len: 128 
+    n_conv: 3
+    h_fea_len: 512
+    n_h: 1
+    out_dim: 256
+  temperature_encoder:
+    in_dim: 1
+    hidden_dim: 512
+    fc_num_layers: 2
+    out_dim: 256
+    act: softplus
+  readout:
+    in_dim: 512
+    hidden_dim: 512
+    fc_num_layers: 2
+    out_dim: 1
+    act: linear
+
+optimization:
+  optimizer: adamw
+  lr: 0.003
+  # scheduler: cosine
+  # scheduler_params:
+  #   T_max: 30
+  #   eta_min: 1e-7
+  # scheduler: step
+  # scheduler_params:
+  #   step_size: 10
+  #   gamma: 0.1
+  scheduler: plateau
+  monitor: val_loss
+  scheduler_params:
+    mode: min
+    factor: 0.5
+    patience: 10
+    verbose: False
+
+
+trainer:
+  accelerator: gpu
+  strategy: ddp
+  devices: 1,9
+  max_epochs: 300
+  precision: bf16
+  gradient_clip_val: 0.1
+
+callback:
+  early_stopping:
+    monitor: val_loss
+    patience: 30
+  model_checkpoint:
+    monitor: val_loss
+    save_top_k: 2
+    mode: min
+  learning_rate_monitor:
+    logging_interval: epoch

@@ -1,0 +1,10 @@
+output
+wandb
+weight
+mace.zip
+logs
+lightning_logs
+mace
+*.ipynb
+*.parquet
+*.csv
