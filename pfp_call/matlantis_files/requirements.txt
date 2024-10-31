@@ -1,0 +1,10 @@
+pfp_api_client
+pandas
+tqdm
+matplotlib
+seaborn
+optuna
+scikit-learn
+ase
+numpy
+scipy
