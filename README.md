@@ -70,4 +70,4 @@ pip install ase pymatgen
 - [MP contribs download](https://docs.materialsproject.org/downloading-data/query-and-download-contributed-data)
 - [The ab initio amorphous materials database: Empowering machine learning to decode diffusivity](https://ar5iv.labs.arxiv.org/html/2402.00177)
 - [MACE](https://github.com/ACEsuit/mace?tab=readme-ov-file): 만약에 그냥 신경망 성능이 맘에 안들면 해보는 걸로
-- [Unlabeled dataset_v2-2](https://drive.google.com/file/d/14u6oMdX6bslK6w9k6fGXn3Lf30teU36i/view?usp=sharing): Materials Project database에서 Li-containing compounds 중 bandgap > 3 eV 이상인 chemical composition 들의 amorphous structure 
+- [Unlabeled dataset_v2-2](https://drive.google.com/file/d/14u6oMdX6bslK6w9k6fGXn3Lf30teU36i/view?usp=sharing): Materials Project database에서 Li-containing compounds 중 bandgap > 3 eV 이상인 chemical composition 들의 amorphous structure; structure_cif열이 비어있지 않은 행만 사용 -> Dataset size = 5916
