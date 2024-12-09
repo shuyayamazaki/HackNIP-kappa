@@ -24,7 +24,7 @@ pip install ase pymatgen
 
 ## Pipeline
 ### Data
-- 현재 가진 데이터 여기에 정리해주세요
+- 현재 가진 데이터 여기에 정리해주세요 - Resources란 UnlabeledDataset_v2-2
 - Preprocessing: Datasource $\rightarrow$ data_save
   - 데이터 전처리 후 POSCAR로 디렉토리에 저장
   - 각 POSCAR와 ionic conductivity label 지정 (condition to specify: ion of interest (Li), temperature (All))
@@ -70,4 +70,4 @@ pip install ase pymatgen
 - [MP contribs download](https://docs.materialsproject.org/downloading-data/query-and-download-contributed-data)
 - [The ab initio amorphous materials database: Empowering machine learning to decode diffusivity](https://ar5iv.labs.arxiv.org/html/2402.00177)
 - [MACE](https://github.com/ACEsuit/mace?tab=readme-ov-file): 만약에 그냥 신경망 성능이 맘에 안들면 해보는 걸로
-- [Unlabeled dataset_v1](https://drive.google.com/file/d/1vrLIkNRyoaPQ15QDsCERxqJraSPFLgvU/view?usp=drive_link): Materials Project database에서 Li-containing compounds 중 bandgap > 3 eV 이상인 chemical composition 들의 amorphous structure 
+- [Unlabeled dataset_v2-2](https://drive.google.com/file/d/14u6oMdX6bslK6w9k6fGXn3Lf30teU36i/view?usp=sharing): Materials Project database에서 Li-containing compounds 중 bandgap > 3 eV 이상인 chemical composition 들의 amorphous structure 
