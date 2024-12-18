@@ -1,4 +1,4 @@
-exp_name: CGCNN-ion-conductivity-exp
+exp_name: MACE-ion-conductivity-remove5000
 debug: False
 seed: 42
 
@@ -6,7 +6,7 @@ dataset: ion-conductivity
 # Data
 data:
   batch_size: 32
-  data_dir: /home/lucky/Projects/GNN_base/data/li-ion-conductivity  # replace with your data path, except _train.parquet, _test.parquet, _val.parquet
+  data_dir: /home/lucky/Projects/ion_conductivity/data/li-ion-conductivity  # replace with your data path, except _train.parquet, _test.parquet, _val.parquet
   num_workers: 12
   label: y
   task: regression
@@ -38,7 +38,7 @@ model:
 
 optimization:
   optimizer: adamw
-  lr: 0.003
+  lr: 0.0003
   # scheduler: cosine
   # scheduler_params:
   #   T_max: 30
@@ -58,10 +58,10 @@ optimization:
 
 trainer:
   accelerator: gpu
-  strategy: ddp
-  devices: 1,9
+  strategy: dp
+  devices: 1
   max_epochs: 300
-  precision: bf16
+  precision: 16-mixed
   gradient_clip_val: 0.1
 
 callback:
