@@ -70,7 +70,7 @@ def main(cfg):
     ################
     trainer = pl.Trainer(
         accelerator=cfg.trainer.accelerator,
-        strategy=DDPStrategy(find_unused_parameters=True),# cfg.trainer.strategy,
+        strategy=cfg.trainer.strategy,#DDPStrategy(find_unused_parameters=True),# cfg.trainer.strategy,
         devices=cfg.trainer.devices,
         max_epochs=cfg.trainer.max_epochs, 
         precision=cfg.trainer.precision,
