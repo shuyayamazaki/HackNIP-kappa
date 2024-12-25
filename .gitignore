@@ -8,3 +8,5 @@ mace
 *.ipynb
 *.parquet
 *.csv
+*.pt
+*.pkl

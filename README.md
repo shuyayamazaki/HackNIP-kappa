@@ -19,11 +19,14 @@ MPContribut에서 RDF, Diffusivity계산했는데 거의 똑같았음.
 ```
 conda create -n ionic python=3.10.13
 conda activate ionic
-pip install torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 --index-url https://download.pytorch.org/whl/cu121
-pip install  dgl -f https://data.dgl.ai/wheels/torch-2.3/cu121/repo.html
-pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.3.0+cu121.html
+pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+pip install  dgl -f https://data.dgl.ai/wheels/torch-2.4/cu121/repo.html
+pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.4.0+cu121.html
 python -m pip install lightning
 pip install hydra-core joblib wandb matplotlib scikit-learn python-dotenv jarvis-tools pymatgen ase rdkit tqdm transformers datasets diffusers fairchem-core
+pip install orb-models
+pip install "pynanoflann@git+https://github.com/dwastberg/pynanoflann#egg=af434039ae14bedcbb838a7808924d6689274168"
+pip3 install auto-sklearn
 
 ```
 
