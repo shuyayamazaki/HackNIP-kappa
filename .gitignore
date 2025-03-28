@@ -1,12 +1,33 @@
-output
-wandb
-weight
-mace.zip
-logs
-lightning_logs
-mace
+
+# feat
+feat/data
+feat/logs
+feat/output
+
+# ion_conductivity
+ion_conductivity/output
+ion_conductivity/wandb
+ion_conductivity/weight
+ion_conductivity/mace.zip
+ion_conductivity/logs
+ion_conductivity/lightning_logs
+ion_conductivity/mace
+ion_conductivity/orb_call
+ion_conductivity/eqv2_call
+
+# orb-models
+orb-models
+
+# data
+*.json
 *.ipynb
 *.parquet
 *.csv
 *.pt
 *.pkl
+*.traj
+*.cif
+
+# cache
+*.pyc
+orb-models
