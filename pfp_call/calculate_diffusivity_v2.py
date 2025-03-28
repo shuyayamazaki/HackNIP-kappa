@@ -81,7 +81,7 @@ def run_remote_script(temp_cif_path, temperature, index):
     try:
         # Remote paths
         remote_cif_path = f"/home/jovyan/SKim/Diffusivity/StrToIcon/input/temp_{index}.cif"
-        diffusivities_script = "/home/jovyan/SKim/Diffusivity/StrToIcon/diffusivity_calc.py"
+        diffusivities_script = "/home/jovyan/SKim/Diffusivity/StrToIcon/diffusivity_calc_debug.py" # debug: _debug
 
         print(f"[INFO] Uploading temp_{index}.cif to remote server.")
         # 1. Upload temp.cif to the remote server

@@ -1,0 +1,43 @@
+[INFO] Reading JSON file.
+[INFO] Calculating diffusivities.
+[INFO] Installing dependencies on remote server.
+[INFO] Removed existing temp.out file
+[INFO] Saving temp_1.cif file.
+[INFO] Saving temp_2.cif file.
+[INFO] Uploading temp_2.cif to remote server.
+[INFO] Uploading temp_1.cif to remote server.
+[INFO] Running remote script for temp_2.cif.
+[INFO] Running remote script for temp_1.cif.
+Traceback (most recent call last):
+  File "/home/sokim/ion_conductivity/pfp_call/calculate_diffusivity_v2.py", line 107, in run_remote_script
+    raise RuntimeError(f"Remote command failed: {stderr}")
+RuntimeError: Remote command failed: websocat: WebSocketError: I/O failure
+websocat: error running
+client_loop: send disconnect: Broken pipe
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/sokim/ion_conductivity/label.py", line 12, in <module>
+    result = calculate_diffusivities(list_to_label[:2])
+  File "/home/sokim/ion_conductivity/pfp_call/calculate_diffusivity_v2.py", line 48, in calculate_diffusivities
+    results = list(executor.map(lambda item: process_item(item[0], *item[1]), enumerate(list_to_label, start=1)))
+  File "/usr/local/anaconda3/lib/python3.9/concurrent/futures/_base.py", line 609, in result_iterator
+    yield fs.pop().result()
+  File "/usr/local/anaconda3/lib/python3.9/concurrent/futures/_base.py", line 446, in result
+    return self.__get_result()
+  File "/usr/local/anaconda3/lib/python3.9/concurrent/futures/_base.py", line 391, in __get_result
+    raise self._exception
+  File "/usr/local/anaconda3/lib/python3.9/concurrent/futures/thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/sokim/ion_conductivity/pfp_call/calculate_diffusivity_v2.py", line 48, in <lambda>
+    results = list(executor.map(lambda item: process_item(item[0], *item[1]), enumerate(list_to_label, start=1)))
+  File "/home/sokim/ion_conductivity/pfp_call/calculate_diffusivity_v2.py", line 38, in process_item
+    diffusivity = run_remote_script(temp_cif_path, temperature, index)
+  File "/home/sokim/ion_conductivity/pfp_call/calculate_diffusivity_v2.py", line 117, in run_remote_script
+    raise RuntimeError(f"Error occurred while running remote script: {e}")
+RuntimeError: Error occurred while running remote script: Remote command failed: websocat: WebSocketError: I/O failure
+websocat: error running
+client_loop: send disconnect: Broken pipe
+

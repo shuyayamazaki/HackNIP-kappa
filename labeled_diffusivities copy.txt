@@ -1,0 +1,10 @@
+Index: 1, Diffusivity: 0.000051767518 cm^2/sec
+Index: 2, Diffusivity: 0.000016823109 cm^2/sec
+Index: 3, Diffusivity: 0.000025997582 cm^2/sec
+Index: 4, Diffusivity: 0.000029394881 cm^2/sec
+Index: 5, Diffusivity: 0.000016205051 cm^2/sec
+Index: 6, Diffusivity: 0.000030837448 cm^2/sec
+Index: 7, Diffusivity: 0.000046497518 cm^2/sec
+Index: 8, Diffusivity: 0.000037266180 cm^2/sec
+Index: 9, Diffusivity: 0.000085896111 cm^2/sec
+Index: 10, Diffusivity: 0.000120641466 cm^2/sec
