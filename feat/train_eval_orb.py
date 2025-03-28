@@ -50,6 +50,59 @@ def get_graph_features(atoms, model, layer_until, device):
     return graph.node_features['feat'].mean(dim=0).cpu().numpy()
 
 
+def get_graph_features_concat(atoms, model, layer_until, device):
+    """
+    Get the graph features from the model until the specified layer.
+    
+    Args:
+    - atoms (dict): Dictionary containing the atomic coordinates and atomic numbers.
+    - model (OrbFrozenMLP): The model to extract the features from.
+    - layer_until (int): The layer until which the features are extracted. (1-15)
+    - device (str): The device to run the model on.
+    
+    Returns:
+    - np.ndarray: The graph features.
+    """
+    graph = atomic_system.ase_atoms_to_atom_graphs(atoms, device=device)
+    graph = model.featurize_edges(graph)
+    graph = model.featurize_nodes(graph)
+    graph = model._encoder(graph)
+
+    features = []
+    for gnn in model.gnn_stacks:
+        graph = gnn(graph)
+        features.append(graph.node_features['feat'].mean(dim=0).cpu().numpy())
+    
+    return np.concatenate(features)
+
+def get_graph_features_maxpool(atoms, model, layer_until, device):
+    """
+    Get the graph features from the model until the specified layer.
+    
+    Args:
+    - atoms (dict): Dictionary containing the atomic coordinates and atomic numbers.
+    - model (OrbFrozenMLP): The model to extract the features from.
+    - layer_until (int): The layer until which the features are extracted. (1-15)
+    - device (str): The device to run the model on.
+    
+    Returns:
+    - np.ndarray: The graph features.
+    """
+    graph = atomic_system.ase_atoms_to_atom_graphs(atoms, device=device)
+    graph = model.featurize_edges(graph)
+    graph = model.featurize_nodes(graph)
+    graph = model._encoder(graph)
+
+    features = []
+    for gnn in model.gnn_stacks:
+        graph = gnn(graph)
+        features.append(graph.node_features['feat'].mean(dim=0).cpu().numpy())
+    
+    features = np.array(features)
+    # dimension-wise max pooling
+    return np.max(features, axis=0)
+
+
 def random_split(dataset_X, dataset_Y, random_seed, valid_size=0, test_size=0.1):
     import random
     random.seed(random_seed)
@@ -229,9 +282,9 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda:0', help='Device to run the model on (cpu or cuda:0)')
-    parser.add_argument('--data_path', type=str, default='/home/lucky/Projects/ion_conductivity/feat/preprocessed_data/MPContribs_armorphous_diffusivity_relaxed.pkl', help='Path to the preprocessed data file')
+    parser.add_argument('--data_path', type=str, default='/home/lucky/Projects/ion_conductivity/feat/preprocessed_data/Exp_relaxed.pkl', help='Path to the preprocessed data file')
     parser.add_argument('--task_type', type=str, default='regression', help='Type of task (classification or regression)')
     parser.add_argument('--split_type', type=str, default='random', help='Type of data split (random or scaffold)')
-    parser.add_argument('--log_transform', type=bool, default=True, help='Whether to apply log transformation to the target values')
+    parser.add_argument('--log_transform', type=bool, default=False, help='Whether to apply log transformation to the target values')
     args = parser.parse_args()
     main(args)

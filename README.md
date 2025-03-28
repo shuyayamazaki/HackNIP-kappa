@@ -27,8 +27,20 @@ pip install hydra-core joblib wandb matplotlib scikit-learn python-dotenv jarvis
 pip install orb-models
 pip install "pynanoflann@git+https://github.com/dwastberg/pynanoflann#egg=af434039ae14bedcbb838a7808924d6689274168"
 pip3 install auto-sklearn
+pip install matbench-discovery
+pip install matbench
+pip install openpyxl
+```
 
 ```
+conda create -n matbench python=3.11
+conda activate matbench
+pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.4.0+cu121.html
+pip install "pynanoflann@git+https://github.com/dwastberg/pynanoflann#egg=af434039ae14bedcbb838a7808924d6689274168"
+pip install matbench-discovery typer
+```
+
 
 ## Pipeline
 ### Data
