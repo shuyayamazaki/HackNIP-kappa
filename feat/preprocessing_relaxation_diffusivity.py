@@ -1,6 +1,5 @@
 # Purpose: Provide ASE atoms w/wo relaxed positions and properties for the dataset.
 import pandas as pd
-import numpy as np
 from tqdm import tqdm
 import pickle
 import argparse
@@ -10,7 +9,6 @@ import tempfile
 from ase import io
 from ase.io.jsonio import encode, decode
 from ase.optimize import BFGS
-from jarvis.core.atoms import Atoms as JAtoms
 
 from orb_models.forcefield import pretrained
 from orb_models.forcefield.calculator import ORBCalculator

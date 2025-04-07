@@ -16,7 +16,7 @@ ion_conductivity/orb_call
 ion_conductivity/eqv2_call
 
 # orb-models
-orb-models
+orb-models/
 
 # data
 *.json
