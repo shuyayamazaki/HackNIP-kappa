@@ -1,6 +1,7 @@
 import pandas as pd
 
 import torch
+import pickle
 from torch.utils.data import Dataset
 
 from rdkit import Chem
@@ -104,7 +105,7 @@ class BaseMoleculeDataset(Dataset):
 from orb_models.forcefield import atomic_system
 from orb_models.forcefield.base import batch_graphs
 
-def collate_fn(samples):
+def collate_fn(samples, device):
     """
     :param samples: list of (ASE Atoms, properties) pairs.
     :param device:  device to create the graphs on (cpu or cuda).
@@ -114,7 +115,7 @@ def collate_fn(samples):
     atoms_list, props_list = zip(*samples)  # each is a tuple
     
     # Convert each ASE atoms object to an ORB-model-compatible graph
-    graphs = [atomic_system.ase_atoms_to_atom_graphs(atoms) for atoms in atoms_list]
+    graphs = [atomic_system.ase_atoms_to_atom_graphs(atoms, device=device) for atoms in atoms_list]
     
     # Batch the list of graphs
     batched_graph = batch_graphs(graphs)
@@ -123,7 +124,7 @@ def collate_fn(samples):
     # if isinstance(props_list[0], int):
     #     props_tensor = torch.tensor(props_list, dtype=torch.long)
     # elif isinstance(props_list[0], float):
-    props_tensor = torch.tensor(props_list, dtype=torch.float)
+    props_tensor = torch.tensor(props_list, dtype=torch.float, device=device)
     # else:
     #     props_tensor = torch.tensor(props_list)  # Default case (fallback)
 
@@ -230,6 +231,89 @@ class MoleculeDatasetSplitter:
                           batch_size=batch_size, 
                           shuffle=shuffle, 
                           collate_fn=collate_fn)
+
+class BaseCrystalDataset(Dataset):
+    def __init__(self, dataframe, structure_col="structure", property_col="target", task_type="regression"):
+        """
+        Dataset for crystalline materials stored as Pymatgen Structures in a CSV.
+
+        Args:
+            csv_path (str): Path to CSV file with structure and property columns.
+            structure_col (str): Column containing Pymatgen Structure objects.
+            property_col (str): Column with target property values.
+            device (str): Torch device ("cpu" or "cuda").
+            orb_system: Preloaded ORB force field system config.
+            task_type (str): "regression" or "classification".
+        """
+        self.data = dataframe
+        self.structures = self.data[structure_col]
+        self.targets = self.data[property_col]
+        self.task_type = task_type
+
+    def __len__(self):
+        return len(self.structures)
+
+    def __getitem__(self, idx):
+        return self.structures.iloc[idx], self.targets.iloc[idx]
+    
+class PickledCrystalDataset(torch.utils.data.Dataset):
+    def __init__(self, pickle_path, task_type="regression"):
+        with open(pickle_path, "rb") as f:
+            data = pickle.load(f)
+
+        self.atoms = data["xps_atoms"]
+        self.targets = data["targets"]
+        assert len(self.atoms) == len(self.targets)
+        self.task_type = task_type
+
+    def __len__(self):
+        return len(self.atoms)
+
+    def __getitem__(self, idx):
+        atom = self.atoms[idx]
+        target = self.targets[idx]
+        dtype = torch.float32 if self.task_type == "regression" else torch.long
+        return atom, torch.tensor(target, dtype=dtype)
+
+class CrystalDatasetSplitter:
+    def __init__(self, dataset, random_seed=42, split_type="random"):
+        self.dataset = dataset
+        self.random_seed = random_seed
+        self.splits = {}
+
+        if split_type == "random":
+            self.random_split()
+        else:
+            raise ValueError(f"Unsupported split_type '{split_type}' for CrystalDatasetSplitter.")
+
+    def random_split(self, valid_size=0.1, test_size=0.1):
+        import random
+        random.seed(self.random_seed)
+
+        dataset_size = len(self.dataset)
+        indices = list(range(dataset_size))
+        random.shuffle(indices)
+
+        valid_cutoff = int(dataset_size * valid_size)
+        test_cutoff = int(dataset_size * test_size)
+
+        valid_indices = indices[:valid_cutoff]
+        test_indices = indices[valid_cutoff:valid_cutoff + test_cutoff]
+        train_indices = indices[valid_cutoff + test_cutoff:]
+
+        self.splits["train"] = train_indices
+        self.splits["valid"] = valid_indices
+        self.splits["test"] = test_indices
+
+    def get_dataloader(self, split, batch_size=32, shuffle=True, collate_fn=None):
+        if split not in self.splits:
+            raise ValueError(f"Split '{split}' does not exist in splits.")
+        
+        from torch.utils.data import Subset, DataLoader
+        
+        subset = Subset(self.dataset, self.splits[split])
+        return DataLoader(subset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_fn)
+    
 
 # Example usage:
 # dataset = ...
