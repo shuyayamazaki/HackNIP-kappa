@@ -1,3 +1,6 @@
+# script to fine-tune orb for direct property prediction
+# env: conda env create -f env.yml
+
 import os, sys, pathlib
 import torch
 import torch.nn as nn
