@@ -26,6 +26,9 @@ class OrbFrozenMLP(nn.Module):
         if freeze_orb:
             for param in orb_model.parameters():
                 param.requires_grad = False
+        else:
+            for param in orb_model.parameters():
+                param.requires_grad = True
         
         self.orb_model = orb_model
         self.task_type = task_type
