@@ -78,7 +78,7 @@ def validate_one_epoch(model, dataloader, device, global_step):
 # ─── Main ───────────────────────────────────────────────────────────────────────
 def main():
 
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
 
     print(f"Command-line arguments: {' '.join(sys.argv)}")
 
@@ -88,18 +88,21 @@ def main():
     print(src_path.read_text())
     print(f"--- End source: {src_path.name} ---")
 
+    run_name = f"orbft_t6_f0.1_s42"
+
     # 1) W&B setup
     wandb.init(
         project="orb-finetune",
+        name = run_name,
         config={
             "epochs": 200,
             "batch_size": 64,
-            "data_path" : '/home/sokim/ion_conductivity/feat/matbench/metadata/t6_data.pkl',
+            "data_path" : '/home/sokim/ion_conductivity/feat/matbench/metadata/t6_data.pkl', # "/home/sokim/ion_conductivity/matbench/preprocessed_data/xps2feat_orb2/3DSC_MP_XPS_orb2_logfiltered_xpsatoms.pkl", # '/home/sokim/ion_conductivity/feat/matbench/metadata/t6_data.pkl',
             "random_seed" : 42,
             "lr_backbone": 1e-5,
             "lr_head": 1e-3,
             "weight_decay": 1e-4,
-            "task": "bandgap"
+            "task": "t6_re"
         }
     )
     config = wandb.config
@@ -118,12 +121,27 @@ def main():
         pickle_path=config.data_path, 
     )
 
-    # reproducible random‐subset
     fraction = 0.1
+<<<<<<< Updated upstream
+    # # reproducible random‐subset
+=======
+    # p = 1
+    # reproducible random‐subset
+>>>>>>> Stashed changes
+    # full_size = len(dataset)
+    # target    = 10_000
+
+    # # automatically choose fraction to get ~10k samples
+    # fraction = min(1.0, target / full_size)
+<<<<<<< Updated upstream
+    # print(fraction)
+=======
+    print(fraction)
+>>>>>>> Stashed changes
     all_indices = np.arange(len(dataset))
     subset_indices, _ = train_test_split(
         all_indices,
-        train_size=0.1,
+        train_size=fraction,
         random_state=config.random_seed,
         shuffle=True
     )
@@ -153,15 +171,18 @@ def main():
         task_type="regression"
     ).to(device)
 
-    # print("\n Checking which model parameters are trainable:")
-    # for name, param in model.named_parameters():
-    #     print(f"{name}: requires_grad = {param.requires_grad}")
+    # if p == 1:
+    #     p += 1
 
     for param in model.orb_model._decoder.parameters():
         param.requires_grad = False
 
     for param in model.orb_model._encoder._edge_fn.parameters():
         param.requires_grad = False
+
+    print("\n Checking which model parameters are trainable:")
+    for name, param in model.named_parameters():
+        print(f"{name}: requires_grad = {param.requires_grad}")
 
     wandb.watch(model, log="all", log_freq=100)
 
@@ -186,7 +207,7 @@ def main():
         # checkpoint
         if val_mae < best_val_mae:
             best_val_mae = val_mae
-            ckpt_name = f"best_orb_finetuned_{config.task}_{fraction}.pt"
+            ckpt_name = f"best_orb_finetuned_{config.task}_{fraction:.4f}.pt"
             torch.save(model.state_dict(), ckpt_name)
 
             # log artifact
@@ -196,7 +217,11 @@ def main():
             print("Best model saved!")
 
     # 9) Final test eval
-    model.load_state_dict(torch.load(f"best_orb_finetuned_{config.task}_{fraction}.pt"))
+<<<<<<< Updated upstream
+    model.load_state_dict(torch.load(f"best_orb_finetuned_{config.task}_{fraction:.3f}.pt"))
+=======
+    model.load_state_dict(torch.load(f"best_orb_finetuned_{config.task}_{fraction:.4f}.pt"))
+>>>>>>> Stashed changes
     test_loss, test_mae = validate_one_epoch(model, test_loader, device, global_step)
     print(f"Test Loss: {test_loss:.4f} | Test MAE: {test_mae:.4f}")
 

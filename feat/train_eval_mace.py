@@ -5,7 +5,6 @@ from tqdm import tqdm
 import pickle
 import argparse
 import json
-import random
 
 import torch
 from torch.utils.data import Dataset
@@ -18,7 +17,6 @@ from ase.optimize import BFGS
 
 from orb_models.forcefield import atomic_system, pretrained
 from orb_models.forcefield.calculator import ORBCalculator
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from fairchem.core import OCPCalculator
 from fairchem.core.datasets import data_list_collater
@@ -27,30 +25,28 @@ from joblib import Parallel, delayed
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier, MLPRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import roc_auc_score, accuracy_score, mean_absolute_error
+from mace.data import AtomicData
 
 from xgboost import XGBClassifier, XGBRegressor
+from mace.calculators import MACECalculator
+from mace.calculators import mace_mp
+from mace.data import AtomicData
+from mace.data.utils import Configuration
+from mace.tools import AtomicNumberTable
+from torch_geometric.data import Batch
+from types import SimpleNamespace
+from mace.data.utils import config_from_atoms
+from mace.calculators.utils import load_checkpoint
+from mace.modules.models import MACE
+from mace.modules.models import ScaleShiftMACE
 
 def get_graph_features(atoms, calc, layer_until, device):
-    """
-    Get the graph features from the model until the specified layer.
-    
-    Args:
-    - atoms (dict): Dictionary containing the atomic coordinates and atomic numbers.
-    - model (OrbFrozenMLP): The model to extract the features from.
-    - layer_until (int): The layer until which the features are extracted. (0-11)
-    - device (str): The device to run the model on.
-    
-    Returns:
-    - np.ndarray: The graph features.
-    """
-    
-    data_object = calc.a2g.convert(atoms)  
-    calc.trainer.model.backbone.num_layers = layer_until  
-    batch = data_list_collater([data_object], otf_graph=True).to(device) # Convert the data to a batch
-    output = calc.trainer.model.backbone.forward(batch) # Run forward pass on the model
-    return output['node_embedding'].embedding.mean(dim=(0,1)).cpu().detach().numpy()
 
+    features = calc.get_descriptors(atoms, invariants_only=True, num_layers=layer_until)
+
+    return features.mean(axis=0)  
 
 def random_split(dataset_X, dataset_Y, random_seed, valid_size=0, test_size=0.1):
     import random
@@ -136,37 +132,37 @@ def main(args):
     # 2. Prepare data and MLIP model
     # -------------------------------
     # Open a file to write outputs
-
-    seed = 42  # You can choose any number
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
-    output_file = f"output/output_{data_path.split('/')[-1].split('.')[0]}_eqV2_86M_{ml_type}.txt"
+    output_file = f"output/output_{data_path.split('/')[-1].split('.')[0]}_mace_{ml_type}.txt"
     with open(output_file, "w") as out:
         with open(data_path, 'rb') as f:
             data = pickle.load(f)
-        calc = OCPCalculator(checkpoint_path="/home/sokim/ion_conductivity/ion_conductivity/eqV2_86M_omat_mp_salex.pt", cpu=False, seed=42)
-        calc.trainer.model.backbone.eval()
-        num_layers = len(calc.trainer.model.backbone.blocks)
-        for layer in range(num_layers): # range(0, 21):
+            
+            # checkpoint_path = "path/to/the/downloaded/checkpoint"
+            # model = torch.load(checkpoint_path, map_location=device)
+            # model = model.to(device)
+            # model.eval()
+            # num_layers = model.num_interactions.item()
+            # calc = MACECalculator(model_paths = checkpoint_path, device=device) 
+
+            calc = mace_mp(model="medium", device=device)
+            num_layers = calc.models[0].num_interactions 
+
+        for layer in range(1, num_layers + 1):
             out.write(f"Layer: {layer}\n")
             for relax in ['X']: #, 'XR'
                 out.write(f"Relaxation: {relax}\n")
                 X = np.array([get_graph_features(decode(json.dumps(atoms_dict)), calc, layer, device) for atoms_dict in data[relax]])
+
                 for prop in data['Y'].keys():
                     out.write(f"Property: {prop}\n")
                     Y = np.array(data['Y'][prop])
 
-                    # # Save X and Y to npy files
-                    # x_save_path = f"output/X_eqV2_layer{layer}_{relax}.npy"
-                    # np.save(x_save_path, X)
+                    x_save_path = f"output/X_mace_{prop}_layer{layer}_{relax}.npy"
+                    np.save(x_save_path, X)
                 
-                    # # Optionally, print or log where they're saved
+                    # Optionally, print or log where they're saved
                     # out.write(f"Saved X to {x_save_path}\n")
-                    # # out.write(f"Saved Y to {y_save_path}\n")
+                    # out.write(f"Saved Y to {y_save_path}\n")
 
                     if task_type == 'classification':
                         result_rocauc = []
@@ -209,12 +205,20 @@ def main(args):
                                 )
                             ml.fit(train_X, train_Y)
 
-                                #  If small dataset: decrease max_depth to 3~5 to avoid overfitting
-                                #  If very large dataset: maybe s
-
-                        # mlp = MLPClassifier(hidden_layer_sizes=(100, 100), max_iter=200) if task_type == 'classification' else MLPRegressor(hidden_layer_sizes=(100, 100), max_iter=200)
-
-                        # mlp.fit(train_X, train_Y)
+                        elif ml_type == 'rf':
+                            if task_type == 'classification':
+                                ml = RandomForestClassifier(
+                                    n_estimators=100,      # number of trees
+                                    max_depth=6,           # maximum depth of each tree (adjust as needed)
+                                    random_state=42
+                                )
+                            else:
+                                ml = RandomForestRegressor(
+                                    n_estimators=100,
+                                    max_depth=6,
+                                    random_state=42
+                                )
+                            ml.fit(train_X, train_Y)
 
                         # Calculate metrics
                         if task_type == 'classification':
