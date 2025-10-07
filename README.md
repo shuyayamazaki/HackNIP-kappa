@@ -1,18 +1,55 @@
-# ion_conductivity   
-**Purpose:** Develop a ionic conductivity prediction model $\rightarrow$ Predict amorphous structure from crystalline structure, temperatrue
+# Leveraging Neural Network Interatomic Potentials for a Foundation Model of Chemistry
 
-## Introduction
-Li ion battery의 conversion cathode 에서 amourphous구조는 crystalline보다 reversibility가 좋을 수도 있다.   
-MP에서 Li포함된 개수가 22000   
-이들 중 band gap으로 3eV cutoff으로 이온 interaction 하는 애들 거르면 1.5k   
-amorphous structure를 PFP로 우선 구함   
-계산 도중 오류가 날 때가 있는데 1.5k보다는 적다   
-온도를 5개 찍기 때문에 (1000, 1500, 2000, 2500, 5000) 적어도 5k개....   
-각 amorphous구조를 NVT로 파라미터 지정해서 ionic conductivity 계산   
-개수가 충분하지 않으니 [SOAP](https://singroup.github.io/dscribe/1.0.x/tutorials/descriptors/soap.html)사용 고려 vs GNN   
-현재MPContribut에서는 amorphous crystal 개수가 서로 달라서 결정/비정질 중 어떤 걸 입력으로 쓰는게 좋은지 비교가 어려움   
-MPContribut에서 RDF, Diffusivity계산했는데 거의 똑같았음.   
-1.5k 다 완성되면 둘 중 어느게 더 예측에 유리한지 확인   
+This repository contains the code for the paper **"Leveraging neural network interatomic potentials for a foundation model of chemistry"** by Kim et al. (2025).
+
+📄 **Paper**: [arXiv:2506.18497](https://arxiv.org/abs/2506.18497)
+
+## Overview
+
+This codebase implements a comprehensive framework for leveraging neural network interatomic potentials (NNIPs) as foundation models for chemistry. The repository provides tools for:
+
+- **Structure relaxation**: Using pretrained NNIPs (ORB, EquiformerV2, MACE) to relax molecular and crystal structures
+- **Feature extraction**: Extracting graph-level features from relaxed structures
+- **Property prediction**: Training downstream ML models for various chemical properties
+- **Benchmark evaluation**: Standardized evaluation on multiple datasets including MoleculeNet, Materials Project, and Matbench
+
+### Key Features
+
+- Support for multiple datasets:
+  - **MoleculeNet**: BACE, BBBP, ClinTox, ESOL, FreeSolv, HIV, Lipophilicity, SIDER, Tox21
+  - **Materials Project**: Band gap prediction, trajectory analysis (MPtrj)
+  - **Amorphous materials**: Diffusivity prediction
+  - **Matbench**: 8 standardized materials science benchmarks
+- Three NNIP backends:
+  - ORB (Orbital Materials)
+  - EquiformerV2
+  - MACE (Machine Learning of Atomic Cluster Expansion)
+- Automated preprocessing and evaluation pipelines
+- Parallel processing support for large-scale experiments
+
+## Repository Structure
+
+```
+HackNIP/
+├── src/
+│   ├── preprocessing_relaxation_*.py  # Data preprocessing scripts
+│   ├── train_eval_*.py                # Model training and evaluation
+│   ├── run_preprocessing.py           # Batch preprocessing runner
+│   ├── run_evaluation.py              # Batch evaluation runner
+│   ├── utils.py                       # Utility functions
+│   ├── matbench/                      # Matbench benchmark scripts
+│   │   ├── 1_retrieve_data.py         # Download Matbench datasets
+│   │   ├── 2_build_sc.py              # Build supercells
+│   │   ├── 3_featurize_orb2.py        # Extract ORB features
+│   │   ├── 4_construct_pkl.py         # Create pickle files
+│   │   ├── 5_train_modnet.py          # Train MODNet models
+│   │   ├── 6_opt_hp_modnet.py         # Hyperparameter optimization
+│   │   └── 7_get_parity_data.py       # Generate parity plots
+│   ├── pnas_ce.ipynb                  # PNAS analysis notebook
+│   └── visualization.ipynb            # Visualization tools
+└── README.md
+
+```
 
 -----------
 ## Installation
@@ -42,56 +79,208 @@ pip install "pynanoflann@git+https://github.com/dwastberg/pynanoflann#egg=af4340
 pip install matbench-discovery typer
 ```
 
+## Usage
 
-## Pipeline
-### Data
-- 현재 가진 데이터 여기에 정리해주세요 - Resources란 UnlabeledDataset_v2-2
-- Preprocessing: Datasource $\rightarrow$ data_save
-  - 데이터 전처리 후 POSCAR로 디렉토리에 저장
-  - 각 POSCAR와 ionic conductivity label 지정 (condition to specify: ion of interest (Li), temperature (All))
-    - Pandas DataFrame column1: poscar column2: label
-  - 용량이 총합 50MB넘어가는지 여부 확인
-- DataLoader: data_save  $\rightarrow$ graph structure
-- Model: graph structure $\rightarrow$ prediction
+### 1. Data Preprocessing
 
--------------------
-## TODO
-- [x] Preprocessing pipeline
-- [x] PFP 사용해도 좋음 (Prof.Li)
-- [x] PFP로 Diffusivity 계산 (4.5h)
-- [x] PFP로 non-stoichiometric한 ionic conductivity계산이 맞는지
-- [x] arena에서 PFP 사용이 가능하고
-- [x] amorphous구조 하나 만드는데 얼마나 걸리는지 (60/day without parallel computing)
-- [x] crystalline CIF만들어서 column 따로 추가 (링크는 아래 Resources/Amorphous diffusivity/data with crystalline structures in csv)
-- [x] MPContrib 중에 MP-ID 없는 애들도 crystal CIF, amorphous CIF 동시에 정리해두기 - 없는 애들은 없음 ㅠ
-- [x] 입력 amorphous/crystalline 중 어떤게 더 잘 맞는지 평가 - 그냥 amorphous 가기로 함
-- [x] SOAP 사용가능 여부 확인 (위에꺼랑 같이 총 4개 실험. 해봤는데 결과가 예측이 잘 안되면 여기서부터 다시시작) - 메모리너무많이 차지해서 폐기
-- [x] 논문의 일부 feature를 이용하여 RF구현-만족할만한 결과가 나오지 않았음. 그리고 설명도 불충분하고 코드도 없어서 이걸 따라가는 건 폐기. 대신 GNN으로 이전에 얻은 결과가 나쁘진 않아서 GNN으로 가자
-- [x] Pretrained GNN으로 간주할 수 있는 MLIP인 ORB에서 논문과 comparable한 예측 결과를 얻었음. 온도를 명시적으로 입력하지는 않지만, cif를 입력받아서 latent vector를 취하고 이를 GP로 훈련시켰을 때 좋은 결과를 얻음.
-- [ ] AL로 활용가능한 알고리즘 탐색. ZoMBI를 활용할 수 있을까 했지만, ZoMBI는 함수를 이미 아는 상태에서 사용할 수 있는 전략임. 다른 알고리즘과 비교하는 것은 시간자원상 어려우므로, 일반적인 AL을 사용해도 좋을 것 같음.
-- [ ] PFP가 실제로 Diffusivity계산이 잘 일치하는지 확인 필요. 계산 과정에 식별되지 않은 문제가 있음.
-- [ ] 배터리를 실제 충방전하는 경우 Stochiometry가 Li 100% 가 아니게 됨. 이것도 미래에 고려할 것이지만 우선은 100%만 먼저 고려해보자.
-- [ ] GNN+AL 현재 가진 unlabled, labeled data에서 훈련 후 경과 보기
-- [ ] 현재 가진 데이터 갯수 정리
+The preprocessing scripts convert various data sources into a unified `.pkl` format containing both unrelaxed and NNIP-relaxed structures.
 
-## Logic
-### Purpose
-서로다른 구조에 대해 예측
+#### Individual Dataset Preprocessing
 
-### Construct unlabled dataset
-- Li ion conductivity 로 제한 (MP에서) (<10k)
-- 
-- Non-stoichiometric 으로 확장
+```bash
+# Band gap prediction (Materials Project)
+python src/preprocessing_relaxation_bandgap.py \
+    --device cuda:0 \
+    --data_path MP \
+    --property_cols '["Eg(eV)"]'
 
-## Diffusion for amorphous
-- Fix adjacency matrix, only denoise coordinates
+# Molecular properties (MoleculeNet)
+python src/preprocessing_relaxation_moleculenet.py \
+    --device cuda:0 \
+    --data_path /path/to/ESOL_dataset.csv \
+    --property_cols '["measured log solubility in mols per litre"]'
+
+# Diffusivity prediction (amorphous materials)
+python src/preprocessing_relaxation_diffusivity.py \
+    --device cuda:0 \
+    --data_path /path/to/diffusivity_data.parquet \
+    --property_cols '["diffusivity"]'
+
+# Materials Project trajectories
+python src/preprocessing_relaxation_mptrj.py \
+    --device cuda:0 \
+    --data_path /path/to/mptrj_data \
+    --property_cols '["energy_per_atom"]'
+```
+
+#### Batch Preprocessing
+
+For processing multiple datasets in parallel:
+
+```bash
+python src/run_preprocessing.py
+```
+
+Edit the script to customize `DEVICES`, `DATA_FILES`, and `PROPERTY_COLS` lists.
+
+### 2. Model Training and Evaluation
+
+Train downstream ML models using features extracted from NNIP-relaxed structures.
+
+#### Using ORB Features
+
+```bash
+python src/train_eval_orb.py \
+    --device cuda:0 \
+    --data_path preprocessed_data/ESOL_dataset_relaxed.pkl \
+    --task_type regression \
+    --split_type random
+```
+
+#### Using EquiformerV2 Features
+
+```bash
+python src/train_eval_eqV2.py \
+    --device cuda:0 \
+    --data_path preprocessed_data/BACE_dataset_relaxed.pkl \
+    --task_type classification \
+    --split_type scaffold
+```
+
+#### Using MACE Features
+
+```bash
+python src/train_eval_mace.py \
+    --device cuda:0 \
+    --data_path preprocessed_data/bandgap_relaxed.pkl \
+    --task_type regression \
+    --split_type random
+```
+
+#### Batch Evaluation
+
+```bash
+python src/run_evaluation.py
+```
+
+### 3. Matbench Benchmark
+
+Follow the sequential pipeline for Matbench evaluation:
+
+```bash
+cd src/matbench
+
+# Step 1: Retrieve datasets from Matbench
+python 1_retrieve_data.py
+
+# Step 2: Build supercells for materials
+python 2_build_sc.py
+
+# Step 3: Extract ORB features from structures
+python 3_featurize_orb2.py
+
+# Step 4: Construct pickle files for training
+python 4_construct_pkl.py
+
+# Step 5: Train MODNet models
+python 5_train_modnet.py
+
+# Step 6: Hyperparameter optimization
+python 6_opt_hp_modnet.py
+
+# Step 7: Generate parity plots and analysis
+python 7_get_parity_data.py
+```
 
 
-## Resources
-- [Amorpous diffusivity](https://contribs.materialsproject.org/projects/amorphous_diffusivity);
-  - [data in csv](https://drive.google.com/file/d/1KZn4WD3NLvlD1lr4PGvCBqZ80Syk5Vzr/view?usp=sharing)
-  - [data with crystalline structures in csv](https://drive.google.com/file/d/1-2YsXG4ezZaHTZsnm3l2swgVw0LO7kDI/view?usp=sharing)
-- [MP contribs download](https://docs.materialsproject.org/downloading-data/query-and-download-contributed-data)
-- [The ab initio amorphous materials database: Empowering machine learning to decode diffusivity](https://ar5iv.labs.arxiv.org/html/2402.00177)
-- [MACE](https://github.com/ACEsuit/mace?tab=readme-ov-file): 만약에 그냥 신경망 성능이 맘에 안들면 해보는 걸로
-- [Unlabeled dataset_v2-3](https://drive.google.com/file/d/1CWYRfr1rtdcT_47mr2OixCXEGuokA5hc/view?usp=sharing): Materials Project database에서 Li-containing compounds 중 bandgap > 3 eV 이상인 chemical composition 들의 amorphous structure; structure_cif열이 비어있지 않은 행만 사용 -> Dataset size = 5916
+## Supported Tasks
+
+### Regression Tasks
+- **ESOL**: Water solubility prediction
+- **FreeSolv**: Solvation free energy
+- **Lipophilicity**: Octanol/water partition coefficient
+- **Band gap**: Electronic band gap of materials
+- **Diffusivity**: Ion diffusion in amorphous materials
+- **Matbench regression**: Formation energy, elastic moduli, phonon properties
+
+### Classification Tasks
+- **BACE**: β-secretase inhibition
+- **BBBP**: Blood-brain barrier permeability
+- **ClinTox**: Clinical trial toxicity
+- **HIV**: HIV inhibition
+- **Tox21**: Nuclear receptor signaling toxicity
+- **SIDER**: Side effect prediction (27 targets)
+
+## Output Format
+
+All preprocessing scripts generate `.pkl` files containing:
+- `X`: List of unrelaxed ASE atoms (JSON-encoded)
+- `XR`: List of NNIP-relaxed ASE atoms (JSON-encoded)
+- `Y`: Dictionary of property values keyed by property name
+
+Training scripts output results to `results/` directory with performance metrics (MAE, R², ROC-AUC, Accuracy).
+
+## Data Resources
+
+### Amorphous Diffusivity Dataset
+- [Materials Project Contribs page](https://contribs.materialsproject.org/projects/amorphous_diffusivity)
+- [CSV data download](https://drive.google.com/file/d/1KZn4WD3NLvlD1lr4PGvCBqZ80Syk5Vzr/view?usp=sharing)
+- [CSV with crystalline structures](https://drive.google.com/file/d/1-2YsXG4ezZaHTZsnm3l2swgVw0LO7kDI/view?usp=sharing)
+- Reference: [The ab initio amorphous materials database: Empowering machine learning to decode diffusivity](https://ar5iv.labs.arxiv.org/html/2402.00177)
+
+### Materials Project
+- [Query and download contributed data](https://docs.materialsproject.org/downloading-data/query-and-download-contributed-data)
+- Band gap data from Materials Project database
+- MPtrj trajectory datasets
+
+### MoleculeNet
+Standard molecular property prediction benchmarks available through:
+- [MoleculeNet website](http://moleculenet.org/)
+- [DeepChem library](https://deepchem.io/)
+
+### Matbench
+- [Matbench package](https://github.com/materialsproject/matbench)
+- 8 standardized materials property prediction tasks
+- Automated data loading via `matbench` Python package
+
+## Citation
+
+If you use this code in your research, please cite:
+
+```bibtex
+@article{kim2025leveraging,
+  title={Leveraging neural network interatomic potentials for a foundation model of chemistry},
+  author={Kim et al.},
+  year={2025},
+  eprint={2506.18497},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG}
+}
+```
+
+**Paper**: https://arxiv.org/abs/2506.18497
+
+## Key Dependencies
+
+- **Neural Network Potentials**:
+  - `orb-models`: ORB pretrained foundation model
+  - `fairchem-core`: EquiformerV2 implementation
+  - MACE models
+
+- **Structure manipulation**:
+  - `ase`: Atomic Simulation Environment
+  - `pymatgen`: Materials analysis
+  - `rdkit`: Molecular informatics
+
+- **Machine Learning**:
+  - `torch`, `torch_geometric`: Deep learning
+  - `sklearn`: Traditional ML models
+  - `lightning`: Training framework
+
+## License
+
+Please refer to the original paper and contact the authors for licensing information.
+
+## Contact
+
+For questions or issues, please open an issue on GitHub or contact the corresponding author of the paper.
