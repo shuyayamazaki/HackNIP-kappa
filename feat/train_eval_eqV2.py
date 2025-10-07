@@ -5,7 +5,6 @@ from tqdm import tqdm
 import pickle
 import argparse
 import json
-import random
 
 import torch
 from torch.utils.data import Dataset
@@ -18,7 +17,6 @@ from ase.optimize import BFGS
 
 from orb_models.forcefield import atomic_system, pretrained
 from orb_models.forcefield.calculator import ORBCalculator
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 from fairchem.core import OCPCalculator
 from fairchem.core.datasets import data_list_collater
@@ -29,7 +27,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.metrics import roc_auc_score, accuracy_score, mean_absolute_error
 
-from xgboost import XGBClassifier, XGBRegressor
 
 def get_graph_features(atoms, calc, layer_until, device):
     """
@@ -131,43 +128,24 @@ def main(args):
     data_path = args.data_path
     split_type = args.split_type
     task_type = args.task_type
-    ml_type = args.ml_type
     # -------------------------------
     # 2. Prepare data and MLIP model
     # -------------------------------
     # Open a file to write outputs
-
-    seed = 42  # You can choose any number
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
-    output_file = f"output/output_{data_path.split('/')[-1].split('.')[0]}_eqV2_86M_{ml_type}.txt"
+    output_file = f"output/output_{data_path.split('/')[-1].split('.')[0]}_eqV2_M.txt"
     with open(output_file, "w") as out:
         with open(data_path, 'rb') as f:
             data = pickle.load(f)
-        calc = OCPCalculator(checkpoint_path="/home/sokim/ion_conductivity/ion_conductivity/eqV2_86M_omat_mp_salex.pt", cpu=False, seed=42)
+        calc = OCPCalculator(checkpoint_path="/home/lucky/Projects/ion_conductivity/ion_conductivity/eqV2_86M_omat_mp_salex.pt", cpu=False)
         calc.trainer.model.backbone.eval()
-        num_layers = len(calc.trainer.model.backbone.blocks)
-        for layer in range(num_layers): # range(0, 21):
+        for layer in range(0, 21):
             out.write(f"Layer: {layer}\n")
-            for relax in ['X']: #, 'XR'
+            for relax in ['X', 'XR']:
                 out.write(f"Relaxation: {relax}\n")
                 X = np.array([get_graph_features(decode(json.dumps(atoms_dict)), calc, layer, device) for atoms_dict in data[relax]])
                 for prop in data['Y'].keys():
                     out.write(f"Property: {prop}\n")
                     Y = np.array(data['Y'][prop])
-
-                    # # Save X and Y to npy files
-                    # x_save_path = f"output/X_eqV2_layer{layer}_{relax}.npy"
-                    # np.save(x_save_path, X)
-                
-                    # # Optionally, print or log where they're saved
-                    # out.write(f"Saved X to {x_save_path}\n")
-                    # # out.write(f"Saved Y to {y_save_path}\n")
-
                     if task_type == 'classification':
                         result_rocauc = []
                         result_acc = []
@@ -183,51 +161,22 @@ def main(args):
                         train_X = scaler.fit_transform(train_X)
                         test_X = scaler.transform(test_X)
 
-                        if ml_type == 'mlp':
-                            ml = MLPClassifier(hidden_layer_sizes=(100, 100), max_iter=200) if task_type == 'classification' else MLPRegressor(hidden_layer_sizes=(100, 100), max_iter=200)
-                            ml.fit(train_X, train_Y)
-                        elif ml_type == 'xgb':
-                            if task_type == 'classification':
-                                ml = XGBClassifier(
-                                    n_estimators=100,        # number of trees
-                                    max_depth=6,             # depth of each tree
-                                    learning_rate=0.1,       # step size shrinkage
-                                    subsample=0.8,           # fraction of samples used per tree
-                                    colsample_bytree=0.8,    # fraction of features used per tree
-                                    random_state=42,
-                                    use_label_encoder=False, # disable warning
-                                    eval_metric='logloss'    # required for newer xgboost versions
-                                )
-                            else:
-                                ml = XGBRegressor(
-                                    n_estimators=100,
-                                    max_depth=6,
-                                    learning_rate=0.1,
-                                    subsample=0.8,
-                                    colsample_bytree=0.8,
-                                    random_state=42
-                                )
-                            ml.fit(train_X, train_Y)
+                        mlp = MLPClassifier(hidden_layer_sizes=(100, 100), max_iter=200) if task_type == 'classification' else MLPRegressor(hidden_layer_sizes=(100, 100), max_iter=200)
 
-                                #  If small dataset: decrease max_depth to 3~5 to avoid overfitting
-                                #  If very large dataset: maybe s
-
-                        # mlp = MLPClassifier(hidden_layer_sizes=(100, 100), max_iter=200) if task_type == 'classification' else MLPRegressor(hidden_layer_sizes=(100, 100), max_iter=200)
-
-                        # mlp.fit(train_X, train_Y)
+                        mlp.fit(train_X, train_Y)
 
                         # Calculate metrics
                         if task_type == 'classification':
-                            preds = ml.predict_proba(test_X)[:, 1]
+                            preds = mlp.predict_proba(test_X)[:, 1]
                             roc_auc = roc_auc_score(test_Y, preds)
-                            preds = ml.predict(test_X)
+                            preds = mlp.predict(test_X)
                             acc = accuracy_score(test_Y, preds)
                             out.write(f"Seed {seed}: {prop} | ROC AUC: {roc_auc} | Accuracy: {acc}\n")
                             result_rocauc.append(roc_auc)
                             result_acc.append(acc)
                         
                         elif task_type == 'regression':
-                            preds = ml.predict(test_X)
+                            preds = mlp.predict(test_X)
                             mae = mean_absolute_error(test_Y, preds)
                             out.write(f"Seed {seed}: {prop} | MAE: {mae}\n")
                             result_mae.append(mae)
@@ -245,6 +194,5 @@ if __name__ == '__main__':
     parser.add_argument('--data_path', type=str, default='/home/lucky/Projects/ion_conductivity/feat/preprocessed_data/BACE_dataset_relaxed.pkl', help='Path to the preprocessed data file')
     parser.add_argument('--task_type', type=str, default='classification', help='Type of task (classification or regression)')
     parser.add_argument('--split_type', type=str, default='scaffold', help='Type of data split (random or scaffold)')
-    parser.add_argument('--ml_type', type=str, default='mlp', help='Type of ML model (mlp, xgb, or rf)')
     args = parser.parse_args()
     main(args)

@@ -14,7 +14,6 @@ from rdkit.Chem import AllChem
 from ase import Atoms
 from ase.io.jsonio import encode, decode
 from ase.optimize import BFGS
-from ase.build import make_supercell
 
 from orb_models.forcefield import atomic_system, pretrained
 from orb_models.forcefield.calculator import ORBCalculator
@@ -23,10 +22,8 @@ from joblib import Parallel, delayed
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier, MLPRegressor
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import roc_auc_score, accuracy_score, mean_absolute_error, r2_score
 
-from xgboost import XGBClassifier, XGBRegressor
 
 def get_graph_features(atoms, model, layer_until, device):
     """
@@ -41,16 +38,6 @@ def get_graph_features(atoms, model, layer_until, device):
     Returns:
     - np.ndarray: The graph features.
     """
-
-    # atoms_params = atoms.cell.cellpar()
-    # scale_factors = np.ceil(10 / atoms_params[:3])
-
-    # if np.any(scale_factors > 1):
-    #     scaling_matrix = np.diag(scale_factors.astype(int))
-    #     atoms_scaled = make_supercell(atoms, scaling_matrix)
-    # else:
-    #     atoms_scaled = atoms   
-
     graph = atomic_system.ase_atoms_to_atom_graphs(atoms, device=device)
     graph = model.featurize_edges(graph)
     graph = model.featurize_nodes(graph)
@@ -116,7 +103,7 @@ def get_graph_features_maxpool(atoms, model, layer_until, device):
     return np.max(features, axis=0)
 
 
-def random_split(dataset_X, dataset_Y, random_seed, valid_size=0, test_size=0.2):
+def random_split(dataset_X, dataset_Y, random_seed, valid_size=0, test_size=0.1):
     import random
     random.seed(random_seed)
 
@@ -138,7 +125,6 @@ def random_split(dataset_X, dataset_Y, random_seed, valid_size=0, test_size=0.2)
 def scaffold_split(dataset_X, dataset_Y, smiles_list, random_seed, valid_size=0, test_size=0.1):
     if smiles_list is None:
         raise ValueError("smiles_list is required for scaffold splitting.")
-    
     import random
     import numpy as np
     from rdkit import Chem
@@ -223,47 +209,25 @@ def main(args):
     data_path = args.data_path
     split_type = args.split_type
     task_type = args.task_type
-    ml_type = args.ml_type
     log_transform = args.log_transform
     # -------------------------------
     # 2. Prepare data and MLIP model
     # -------------------------------
     # Open a file to write outputs
-    output_file = f"output/output_{data_path.split('/')[-1].split('.')[0]}_orb_{ml_type}_v3_XR.txt"
+    output_file = f"output/output_{data_path.split('/')[-1].split('.')[0]}_decode.txt"
     with open(output_file, "w") as out:
         with open(data_path, 'rb') as f:
             data = pickle.load(f)
         orbff = pretrained.orb_v2(device=device)
         orbff.model.eval()
-        calc = ORBCalculator(orbff, device=device)
-
-        data["XR"] = []
-        for i, atoms_dict in enumerate(data["X"]):
-            atoms = decode(json.dumps(atoms_dict))  # Convert dict -> Atoms
-            atoms.calc = calc
-            optimizer = BFGS(atoms, logfile=None)
-            optimizer.run(fmax=0.005)
-            relaxed_atoms = atoms.copy()
-            data["XR"].append(json.loads(encode(relaxed_atoms)))
-
         for layer in range(1, 16):
             out.write(f"Layer: {layer}\n")
-            for relax in ['XR']: #, 'XR'
+            for relax in ['X', 'XR']:
                 out.write(f"Relaxation: {relax}\n")
                 X = np.array([get_graph_features(decode(json.dumps(atoms_dict)), orbff.model, layer, device) for atoms_dict in data[relax]])
                 for prop in data['Y'].keys():
                     out.write(f"Property: {prop}\n")
                     Y = np.array(data['Y'][prop])
-
-                #     # Save X and Y to npy files
-                #     x_save_path = f"output/X_orb_layer{layer}_{relax}.npy"
-                #     y_save_path = f"output/Y_layer{layer}_{relax}_{prop}.npy"
-                #     np.save(x_save_path, X)
-                #     np.save(y_save_path, Y)
-
-                # # Optionally, print or log where they're saved
-                #     out.write(f"Saved X to {x_save_path}\n")
-                #     out.write(f"Saved Y to {y_save_path}\n")
                     if task_type == 'classification':
                         result_rocauc = []
                         result_acc = []
@@ -285,62 +249,22 @@ def main(args):
                             log_scaler = LogTransformer(log_transform=log_transform)
                             train_Y = log_scaler.fit(train_Y).transform(train_Y)
 
-                            if ml_type == 'mlp':
-                                ml = MLPClassifier(hidden_layer_sizes=(100, 100), max_iter=200) if task_type == 'classification' else MLPRegressor(hidden_layer_sizes=(100, 100), max_iter=200)
-                                ml.fit(train_X, train_Y)
-                            elif ml_type == 'xgb':
-                                if task_type == 'classification':
-                                    ml = XGBClassifier(
-                                        n_estimators=100,        # number of trees
-                                        max_depth=6,             # depth of each tree
-                                        learning_rate=0.1,       # step size shrinkage
-                                        subsample=0.8,           # fraction of samples used per tree
-                                        colsample_bytree=0.8,    # fraction of features used per tree
-                                        random_state=42,
-                                        use_label_encoder=False, # disable warning
-                                        eval_metric='logloss'    # required for newer xgboost versions
-                                    )
-                                else:
-                                    ml = XGBRegressor(
-                                        n_estimators=100,
-                                        max_depth=6,
-                                        learning_rate=0.1,
-                                        subsample=0.8,
-                                        colsample_bytree=0.8,
-                                        random_state=42
-                                    )
-                                ml.fit(train_X, train_Y)
+                        mlp = MLPClassifier(hidden_layer_sizes=(100, 100), max_iter=200) if task_type == 'classification' else MLPRegressor(hidden_layer_sizes=(100, 100), max_iter=200)
 
-                            elif ml_type == 'rf':
-                                if task_type == 'classification':
-                                    ml = RandomForestClassifier(
-                                        n_estimators=100,      # number of trees
-                                        max_depth=6,           # maximum depth of each tree (adjust as needed)
-                                        random_state=42
-                                    )
-                                else:
-                                    ml = RandomForestRegressor(
-                                        n_estimators=100,
-                                        max_depth=6,
-                                        random_state=42
-                                    )
-                                ml.fit(train_X, train_Y)
-
-                                #  If small dataset: decrease max_depth to 3~5 to avoid overfitting
-                                #  If very large dataset: maybe slightly lower learning_rate=0.05 and increase n_estimators=200.
+                        mlp.fit(train_X, train_Y)
 
                         # Calculate metrics
                         if task_type == 'classification':
-                            preds = ml.predict_proba(test_X)[:, 1]
+                            preds = mlp.predict_proba(test_X)[:, 1]
                             roc_auc = roc_auc_score(test_Y, preds)
-                            preds = ml.predict(test_X)
+                            preds = mlp.predict(test_X)
                             acc = accuracy_score(test_Y, preds)
                             out.write(f"Seed {seed}: {prop} | ROC AUC: {roc_auc} | Accuracy: {acc}\n")
                             result_rocauc.append(roc_auc)
                             result_acc.append(acc)
                         
                         elif task_type == 'regression':
-                            preds = ml.predict(test_X)
+                            preds = mlp.predict(test_X)
                             preds = log_scaler.inverse_transform(preds)
                             mae = mean_absolute_error(test_Y, preds)
                             r2 = r2_score(test_Y, preds)
@@ -357,11 +281,10 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--device', type=str, default='cuda:1', help='Device to run the model on (cpu or cuda:0)')
-    parser.add_argument('--data_path', type=str, default='/home/sokim/ion_conductivity/feat/preprocessed_data/MPContribs_armorphous_diffusivity_relaxed.pkl', help='Path to the preprocessed data file')
+    parser.add_argument('--device', type=str, default='cuda:0', help='Device to run the model on (cpu or cuda:0)')
+    parser.add_argument('--data_path', type=str, default='/home/lucky/Projects/ion_conductivity/feat/preprocessed_data/Exp_relaxed.pkl', help='Path to the preprocessed data file')
     parser.add_argument('--task_type', type=str, default='regression', help='Type of task (classification or regression)')
     parser.add_argument('--split_type', type=str, default='random', help='Type of data split (random or scaffold)')
-    parser.add_argument('--ml_type', type=str, default='mlp', help='Type of ML model (mlp, xgb, or rf)')
     parser.add_argument('--log_transform', type=bool, default=False, help='Whether to apply log transformation to the target values')
     args = parser.parse_args()
     main(args)

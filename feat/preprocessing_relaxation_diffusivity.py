@@ -100,7 +100,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parse input arguments for the script.")
 
     parser.add_argument("--device", type=str, default='cpu', help="Device to use (e.g., cuda:0, cpu)")
-    parser.add_argument("--data_path", type=str, default='/home/sokim/ion_conductivity/ion_conductivity/data/MPContribs_armorphous_diffusivity.parquet', help="Path to the dataset CSV file")
+    parser.add_argument("--data_path", type=str, default='/home/lucky/Projects/ion_conductivity/ion_conductivity/data/MPContribs_armorphous_diffusivity.parquet', help="Path to the dataset CSV file")
     parser.add_argument("--property_cols", type=json.loads, default=['data_properties_A_diffusivity_value'], help="List of property columns to use")
 
     args = parser.parse_args()
