@@ -279,7 +279,7 @@ If you use this code in your research, please cite:
 
 ## License
 
-Please refer to the original paper and contact the authors for licensing information.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Contact
 
