@@ -67,6 +67,7 @@ python run_benchmark.py \
   --py-matbench ~/miniconda3/envs/matbench_env/bin/python \
   --py-mlip ~/miniconda3/envs/hacknip_env/bin/python \
   --py-mlmodel ~/miniconda3/envs/hacknip_env/bin/python
+  --tasks mp_gap,phonons --steps 1-4
 ```
 
 ### Example: dry run

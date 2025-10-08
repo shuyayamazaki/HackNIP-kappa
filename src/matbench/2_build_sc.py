@@ -30,15 +30,6 @@ def main():
 
     checkpoint   = 1000
     target_len  = 10.0  # minimum length of cell vector after supercelling, in angstroms: 10 (orb2 and eqV2) or 12 (mace)
-    # structures_dir = '/home/sokim/Projects/HackNIP/src/matbench/structures'
-
-    # for i in range(1,9):
-
-    #     print(f"[INFO] Task {i} started")
-
-    #     xp_path = f'/home/sokim/ion_conductivity/feat/matbench/structures/t{i}_all_XP.traj'
-    #     output_path = xp_path.replace('_XP.traj', '_XPS.traj')
-
     task_slugs = parse_task_list(TASKS)
 
     for task in task_slugs[:]:

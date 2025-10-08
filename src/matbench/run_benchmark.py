@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# run_benchmark.py — slug-only tasks, portable data dir, selectable MLIP & MODEL
 
 import argparse, os, shlex, subprocess, sys
 from pathlib import Path
@@ -157,7 +156,7 @@ def main():
     PY_MLIP  = resolve_python(args.py_mlip, args.mlip_env, args.mlip_conda, fallback="python")
     PY_MLMODEL  = resolve_python(args.py_mlmodel, args.mlmodel_env, args.mlmodel_conda, fallback="python")
 
-    # step map (step 3 depends on mlip; 5–7 depend on model)
+    # step map
     STEPS = {
         1: ("1_retrieve_data.py",              "matbench"),
         2: ("2_build_sc.py",                   "mlip"),
@@ -165,7 +164,7 @@ def main():
         4: ("4_construct_pkl.py",              "mlip"),
         5: (f"5_train_{model}.py",             "mlmodel"),
         6: (f"6_opt_hp_{model}.py",            "mlmodel"),
-        7: (f"7_get_parity_data.py",           "mlmodel"),  # ← model-specific
+        7: (f"7_get_parity_data.py",           "mlmodel"),
     }
 
     steps = parse_steps(args.steps, STEPS.keys())

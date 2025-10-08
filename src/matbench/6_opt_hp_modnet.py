@@ -22,7 +22,6 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error, r2_score
 from modnet.preprocessing import MODData
 from modnet.models import MODNetModel
-from modnet.matbench.benchmark import matbench_benchmark
 
 import os, random, pickle
 import numpy as np, pandas as pd
@@ -55,11 +54,7 @@ for p in [STRUCTURES_DIR, META_DIR, FEAT_DIR, NPY_DIR, RESULTS_DIR, HP_DIR, PARI
 KEY        = "XPS"
 key        = KEY.lower()
 L_MIN, L_MAX = 1, 15  # valid layer bounds
-n_trials   = 5            # total hyperparameter evaluations
-
-# data_dir   = f'/home/sokim/HackNIP/src/matbench/{key}2feat_{MLIP}'
-# out_dir = os.path.join(data_dir, 'modnet_results_hp')
-# os.makedirs(out_dir, exist_ok=True)
+n_trials   = 50            # total hyperparameter evaluations
 
 # outer CV splitter
 matbench_seed = 18012019

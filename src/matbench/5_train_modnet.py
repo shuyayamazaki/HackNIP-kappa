@@ -18,7 +18,6 @@ MLIP      = os.environ.get("BENCH_MLIP", "orb2")
 MODEL     = os.environ.get("BENCH_MODEL", "results_modnet")
 TASKS     = os.environ.get("BENCH_TASKS")
 
-# common dirs (suggestion: namespace by model)
 STRUCTURES_DIR = DATA_ROOT / "structures"
 META_DIR       = DATA_ROOT / "metadata"
 FEAT_DIR       = DATA_ROOT / f"feat_{MLIP}"

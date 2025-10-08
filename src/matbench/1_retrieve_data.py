@@ -46,26 +46,5 @@ def main():
         atoms = [AseAtomsAdaptor.get_atoms(s) for s in df.structure]
         write(out_traj, atoms)
 
-    # mb = MatbenchBenchmark(subset=TASKS)
-    # for i, task in enumerate(mb.tasks, start=1):
-    #     task.load()
-    #     # name     = task.dataset_name
-    #     df       = task.df
-    #     ids      = list(df.index)
-    #     targets  = df[task.metadata.target].to_numpy()
-
-    #     # save metadata
-    #     meta = {'ids': ids, 'targets': targets}
-    #     meta_path = os.path.join(META_DIR, f't{i}_meta.pkl') # t1: dielectric; t2: jdft2d; ...
-    #     with open(meta_path, 'wb') as f:
-    #         pickle.dump(meta, f)
-    #     print(f"[INFO] saved metadata → {meta_path}")
-
-    #     all_input_path = f"{STRUCTURES_DIR}/t{i}_all_XP.traj"
-    #     all_atoms = [AseAtomsAdaptor.get_atoms(s) for s in task.df.structure]
-    #     write(all_input_path, all_atoms)
-    #     print(f"[INFO] Wrote {len(all_atoms)} structures to {all_input_path}")
-
-
 if __name__ == "__main__":
     main()
