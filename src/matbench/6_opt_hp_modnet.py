@@ -36,14 +36,14 @@ from pathlib import Path
 
 DATA_ROOT = Path(os.environ.get("BENCH_DATA_DIR", Path(__file__).resolve().parent / "benchmark_data")).resolve()
 MLIP      = os.environ.get("BENCH_MLIP", "orb2")
-MODEL     = os.environ.get("BENCH_MODEL", "results_modnet")
+MODEL     = os.environ.get("BENCH_MODEL", "modnet")
 TASKS     = os.environ.get("BENCH_TASKS")
 
 STRUCTURES_DIR = DATA_ROOT / "structures"
 META_DIR       = DATA_ROOT / "metadata"
 FEAT_DIR       = DATA_ROOT / f"feat_{MLIP}"
 NPY_DIR        = FEAT_DIR / "npy"
-RESULTS_DIR    = DATA_ROOT / MODEL
+RESULTS_DIR    = FEAT_DIR / f"results_{MODEL}"
 HP_DIR         = RESULTS_DIR / "hp"
 PARITY_DIR     = RESULTS_DIR / "parity"
 
