@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-# ----- valid task slugs (no numbers allowed) -----
+# ----- valid task slugs -----
 TASKS = [
     "dielectric", "jdft2d", "log_gvrh", "log_kvrh",
     "mp_e_form", "mp_gap", "perovskites", "phonons",

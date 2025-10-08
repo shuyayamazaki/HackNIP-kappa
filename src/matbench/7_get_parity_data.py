@@ -46,7 +46,6 @@ def main():
     print("PyTorch device:", device)
     print("TensorFlow GPUs:", tf.config.list_logical_devices("GPU"))
 
-    # Reproducibility
     seed = 42
     random.seed(seed)
     np.random.seed(seed)
@@ -69,7 +68,6 @@ def main():
     for task in task_slugs[:]:
 
     # Loop through each row in the CSV to use different hyperparameters
-    # for _, row in opted_hp_df.iterrows():
         match = opted_hp_df.loc[opted_hp_df["task"] == task]
         if match.empty:
             raise ValueError(f"No hyperparams found for task: {task}")

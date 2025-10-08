@@ -43,12 +43,12 @@ pip install orb-models==0.4.2 ase optuna modnet
 ## Running the Pipeline
 
 ### Basic usage
-```bash
-python run_benchmark.py
-```
 Runs all steps for all tasks using default settings:
 * MLIP: orb2
 * MODEL: modnet
+```bash
+python run_benchmark.py
+```
 
 Data and logs are automatically placed under
 ```bash

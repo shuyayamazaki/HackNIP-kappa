@@ -1,4 +1,4 @@
-# script to construct .pkl files from .npy files
+# script to construct .pkl
 
 import os, pickle
 import numpy as np

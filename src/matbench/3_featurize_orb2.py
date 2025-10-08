@@ -1,6 +1,6 @@
 # script to featurize using orb2
 
-import os, sys, random, torch, pathlib
+import os, sys, random, torch
 from tqdm import tqdm
 import numpy as np
 from ase.io import read
@@ -63,7 +63,7 @@ def main():
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False  # disables autotuning, useful for reproducibility
+    torch.backends.cudnn.benchmark = False 
 
     orbff = pretrained.orb_v2(device=device)
     model = orbff.model

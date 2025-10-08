@@ -39,7 +39,6 @@ MLIP      = os.environ.get("BENCH_MLIP", "orb2")
 MODEL     = os.environ.get("BENCH_MODEL", "results_modnet")
 TASKS     = os.environ.get("BENCH_TASKS")
 
-# common dirs (suggestion: namespace by model)
 STRUCTURES_DIR = DATA_ROOT / "structures"
 META_DIR       = DATA_ROOT / "metadata"
 FEAT_DIR       = DATA_ROOT / f"feat_{MLIP}"
@@ -54,7 +53,7 @@ for p in [STRUCTURES_DIR, META_DIR, FEAT_DIR, NPY_DIR, RESULTS_DIR, HP_DIR, PARI
 KEY        = "XPS"
 key        = KEY.lower()
 L_MIN, L_MAX = 1, 15  # valid layer bounds
-n_trials   = 50            # total hyperparameter evaluations
+n_trials   = 50       # total hyperparameter evaluations
 
 # outer CV splitter
 matbench_seed = 18012019
@@ -87,7 +86,7 @@ def objective(trial, X_all, y_all):
     hidden = [[width] for _ in range(depth)]      # e.g. depth=3 → [[256],[256],[256]]
     blocks = tuple(hidden) + ([],) * (4 - depth)  # → ([256],[256],[256],[])
     loss = trial.suggest_categorical("loss", ["mae"])
-    out_act = trial.suggest_categorical("out_act", ["relu"])
+    out_act = trial.suggest_categorical("out_act", ["relu", "linear"])
 
     maes = []
 
@@ -152,7 +151,6 @@ def main():
     print("PyTorch device:", device)
     print("TensorFlow GPUs:", tf.config.list_logical_devices("GPU"))
 
-    # reproducibility
     seed = 42
     random.seed(seed)
     np.random.seed(seed)

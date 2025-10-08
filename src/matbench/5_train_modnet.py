@@ -1,4 +1,4 @@
-# script to find the best layer for each task with fixed hyper-parameters; ML model: MODnet
+# script to find the best layer for each task with fixed hyper-parameters
 
 import os, csv, random, pickle
 import numpy as np
@@ -31,7 +31,7 @@ for p in [STRUCTURES_DIR, META_DIR, FEAT_DIR, NPY_DIR, RESULTS_DIR, HP_DIR, PARI
 
 def main():
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"    # expose only physical GPU #1
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"   
     for gpu in tf.config.list_physical_devices("GPU"):
         tf.config.experimental.set_memory_growth(gpu, True)
 
@@ -50,9 +50,6 @@ def main():
 
     KEY   = "XPS"
     key   = KEY.lower()
-    # data_dir = f'/home/sokim/ion_conductivity/feat/matbench/{key}2feat_{MLIP}'
-    # out_dir = os.path.join(data_dir, 'modnet_results')
-    # os.makedirs(out_dir, exist_ok = True)
 
     task_slugs = parse_task_list(TASKS)
     matbench_seed = 18012019
