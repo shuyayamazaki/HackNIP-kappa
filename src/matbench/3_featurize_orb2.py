@@ -1,5 +1,4 @@
 # script to featurize using orb2
-# env: python 3.9, pip install orb-models, not compatible with matbench
 
 import os, sys, random, torch, pathlib
 from tqdm import tqdm
@@ -7,6 +6,25 @@ import numpy as np
 from ase.io import read
 from orb_models.forcefield import atomic_system, pretrained
 from orb_models.forcefield.calculator import ORBCalculator
+from run_benchmark import parse_task_list
+from pathlib import Path
+
+DATA_ROOT = Path(os.environ.get("BENCH_DATA_DIR", Path(__file__).resolve().parent / "benchmark_data")).resolve()
+MLIP      = os.environ.get("BENCH_MLIP", "orb2")
+MODEL     = os.environ.get("BENCH_MODEL", "results_modnet")
+TASKS     = os.environ.get("BENCH_TASKS")
+
+# common dirs (suggestion: namespace by model)
+STRUCTURES_DIR = DATA_ROOT / "structures"
+META_DIR       = DATA_ROOT / "metadata"
+FEAT_DIR       = DATA_ROOT / f"feat_{MLIP}"
+NPY_DIR        = FEAT_DIR / "npy"
+RESULTS_DIR    = DATA_ROOT / MODEL
+HP_DIR         = RESULTS_DIR / "hp"
+PARITY_DIR     = RESULTS_DIR / "parity"
+
+for p in [STRUCTURES_DIR, META_DIR, FEAT_DIR, NPY_DIR, RESULTS_DIR, HP_DIR, PARITY_DIR]:
+    p.mkdir(parents=True, exist_ok=True)
 
 def get_graph_features(atoms, model, layer_until, device):
     """
@@ -34,40 +52,37 @@ def get_graph_features(atoms, model, layer_until, device):
 
 print(f"Command-line arguments: {' '.join(sys.argv)}")
 
-# log the full source into the log file
-src_path = pathlib.Path(__file__).resolve()
-print(f"--- Begin source: {src_path.name} ---")
-print(src_path.read_text())
-print(f"--- End source: {src_path.name} ---")
+def main():
 
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
-KEY = "XPS"
-key = KEY.lower()
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    KEY = "XPS"
+    key = KEY.lower()
 
-seed = 42
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False  # disables autotuning, useful for reproducibility
+    seed = 42
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False  # disables autotuning, useful for reproducibility
 
-data_dir = '/home/sokim/ion_conductivity/feat/matbench/structures'
-results_dir = f'/home/sokim/ion_conductivity/feat/matbench/{key}2feat_orb2'
-os.makedirs(results_dir, exist_ok=True)
+    orbff = pretrained.orb_v2(device=device)
+    model = orbff.model
+    calc = ORBCalculator(orbff, device=device)
 
-orbff = pretrained.orb_v2(device=device)
-model = orbff.model
-calc = ORBCalculator(orbff, device=device)
+    task_slugs = parse_task_list(TASKS)
 
-for i in [6]: # range(1,9)
+    for task in task_slugs[:]:
 
-    xps_path = os.path.join(data_dir, f't{i}_all_{KEY}.traj')
-    xps_all_atoms = read(xps_path, index = "::")
+        sc_path = os.path.join(STRUCTURES_DIR, f'{task}_all_{KEY}.traj')
+        sc_atoms = read(sc_path, index = "::")
 
-    for l in range(1,16):
-        feat = []
-        f_path = os.path.join(results_dir, f't{i}_all_{KEY}_l{l}.npy')
+        for l in range(1,16):
+            feat = []
+            f_path = os.path.join(NPY_DIR, f'{task}_all_{KEY}_l{l}.npy')
 
-        feat = [get_graph_features(atoms, model, l, device) for atoms in tqdm(xps_all_atoms, desc=f"featuring t{i} l{l}")]
-        np.save(f_path, feat)
+            feat = [get_graph_features(atoms, model, l, device) for atoms in tqdm(sc_atoms, desc=f"featurizing {task} l{l}")]
+            np.save(f_path, feat)
+
+if __name__ == '__main__':
+    main()

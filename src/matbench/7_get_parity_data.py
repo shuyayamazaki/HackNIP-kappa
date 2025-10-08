@@ -1,172 +1,195 @@
-import os, sys, pathlib
+# script to generate parity data
+
+import os
 import random, pickle
 import numpy as np
 import pandas as pd
-import torch
-import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.pyplot as plt
+
+import torch  
+import tensorflow as tf
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import KFold
 from modnet.preprocessing import MODData
 from modnet.models import MODNetModel
+from run_benchmark import parse_task_list
+from pathlib import Path
 
-# Set CUDA visibility and device configurations
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"    # Expose only physical GPU #1
-import tensorflow as tf
-gpus = tf.config.list_physical_devices("GPU")
-for gpu in gpus:
-    tf.config.experimental.set_memory_growth(gpu, True)
+DATA_ROOT = Path(os.environ.get("BENCH_DATA_DIR", Path(__file__).resolve().parent / "benchmark_data")).resolve()
+MLIP      = os.environ.get("BENCH_MLIP", "orb2")
+MODEL     = os.environ.get("BENCH_MODEL", "results_modnet")
+TASKS     = os.environ.get("BENCH_TASKS")
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print("PyTorch device:", device)
-print("TensorFlow GPUs:", tf.config.list_logical_devices("GPU"))
+# common dirs (suggestion: namespace by model)
+STRUCTURES_DIR = DATA_ROOT / "structures"
+META_DIR       = DATA_ROOT / "metadata"
+FEAT_DIR       = DATA_ROOT / f"feat_{MLIP}"
+NPY_DIR        = FEAT_DIR / "npy"
+RESULTS_DIR    = DATA_ROOT / MODEL
+HP_DIR         = RESULTS_DIR / "hp"
+PARITY_DIR     = RESULTS_DIR / "parity"
 
-# Set random seeds for reproducibility
-seed = 42
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark     = False
-tf.random.set_seed(seed)  # Set TensorFlow's random seed for deterministic results
+for p in [STRUCTURES_DIR, META_DIR, FEAT_DIR, NPY_DIR, RESULTS_DIR, HP_DIR, PARITY_DIR]:
+    p.mkdir(parents=True, exist_ok=True)
 
-print(f"Command-line arguments: {' '.join(sys.argv)}")
+mpl.rcParams["figure.dpi"] = 300
+plt.rc("font", family="Arial", size=7)
 
-# log the full source into the log file
-src_path = pathlib.Path(__file__).resolve()
-print(f"--- Begin source: {src_path.name} ---")
-print(src_path.read_text())
-print(f"--- End source: {src_path.name} ---")
+def main():
 
-# Read the optimized hyperparameters from the CSV file
-opted_hp_df = pd.read_csv('/home/sokim/ion_conductivity/matbench/modnet/opted_hp.csv')
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0" 
+    gpus = tf.config.list_physical_devices("GPU")
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
 
-# Directories
-KEY = "XPS"
-key = KEY.lower()
-mlip = "orb2"
-data_dir = f'/home/sokim/ion_conductivity/matbench/{key}2feat_{mlip}'
-out_dir = '/home/sokim/ion_conductivity/matbench/modnet/results'
-os.makedirs(out_dir, exist_ok=True)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("PyTorch device:", device)
+    print("TensorFlow GPUs:", tf.config.list_logical_devices("GPU"))
 
-# Loop through each row in the CSV to use different hyperparameters
-for _, row in opted_hp_df.iterrows():
-    i = row['task']
-    l = row['layer']
-    
-    # Extract the optimized hyperparameters
-    batch_size = row['batch_size']
-    lr = row['learning_rate']
-    N_features = row['N_features']
-    depth = row['depth']
-    width = row['width']
-    hidden = [[width] for _ in range(depth)]      # e.g. depth=3 → [[256],[256],[256]]
-    blocks = tuple(hidden) + ([],) * (4 - depth)  # → ([256],[256],[256],[])
-    print("hidden:", hidden)
-    loss = row['loss']
-    out_act = row['out_act']
+    # Reproducibility
+    seed = 42
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark     = False
+    tf.random.set_seed(seed)  
 
-    output_path = os.path.join(out_dir, 'benchmark.txt')
+    # Read the optimized hyperparameters from the CSV file
+    opt_hp_path = Path(HP_DIR) / "benchmark_optuna.csv"
+    opted_hp_df = pd.read_csv(opt_hp_path)
 
-    # Load features and targets
-    feat = pickle.load(open(os.path.join(data_dir, f't{i}_{KEY}_{mlip}.pkl'), 'rb'))
-    X_all = feat[f'{KEY}_l{l}']
-    y_all = feat['targets']
+    KEY = "XPS"
+    key = KEY.lower()
 
-    maes = []
-    r2s = []
+    task_slugs = parse_task_list(TASKS)
 
-    matbench_seed = 18012019
-    outer_cv = KFold(n_splits=5, shuffle=True, random_state=matbench_seed)
-    task_data = {}
+    for task in task_slugs[:]:
 
-    # Train and evaluate the model for each fold in cross-validation
-    for j, (train_idx, test_idx) in enumerate(outer_cv.split(X_all), start=1):
-        X_train, X_test = X_all[train_idx], X_all[test_idx]
-        y_train, y_test = y_all[train_idx], y_all[test_idx]
+    # Loop through each row in the CSV to use different hyperparameters
+    # for _, row in opted_hp_df.iterrows():
+        match = opted_hp_df.loc[opted_hp_df["task"] == task]
+        if match.empty:
+            raise ValueError(f"No hyperparams found for task: {task}")
 
-        cols = list(pd.DataFrame(X_train).columns)[:N_features]
+        row = match.iloc[0]
+        l           = int(row["layer"])
+        batch_size  = int(row["batch_size"])
+        lr          = float(row["learning_rate"])
+        N_features  = int(row["N_features"])
+        depth       = int(row["depth"])
+        width       = int(row["width"])
+        loss        = row["loss"]
+        out_act     = row["out_act"]
+        hidden = [[width] for _ in range(depth)]      # e.g. depth=3 → [[256],[256],[256]]
+        blocks = tuple(hidden) + ([],) * (4 - depth)  # → ([256],[256],[256],[])
+        print("hidden:", hidden)
+        loss = row['loss']
+        out_act = row['out_act']
 
-        # Wrap into MODData
-        md_tr = MODData(
-            df_featurized=pd.DataFrame(X_train[:, :N_features], columns=cols),
-            targets=pd.Series(y_train),
-            target_names=["g"]
-        )
-        md_tr.optimal_features = cols
+        output_path = os.path.join(PARITY_DIR, 'benchmark.txt')
 
-        md_te = MODData(
-            df_featurized=pd.DataFrame(X_test[:, :N_features], columns=cols),
-            targets=pd.Series(y_test),
-            target_names=["g"]
-        )
-        md_te.optimal_features = cols
+        # Load features and targets
+        feat = pickle.load(open(os.path.join(FEAT_DIR, f'{task}_{KEY}_{MLIP}.pkl'), 'rb'))
+        X_all = feat[f'{KEY}_l{l}']
+        y_all = feat['targets']
 
-        # Build and fit the model
-        model = MODNetModel(
-            targets=[["g"]],
-            weights={"g": 1.0},
-            num_neurons=blocks,
-            n_feat=N_features,
-            num_classes={"g": 0},
-            out_act=out_act
-        )
-        model.fit(
-            md_tr,
-            batch_size=batch_size,
-            lr=lr,
-            loss=loss
-        )
+        maes = []
+        r2s = []
 
-        # Predict and score
-        y_train_pred = model.predict(md_tr, remap_out_of_bounds=False).squeeze()
-        y_pred = model.predict(md_te, remap_out_of_bounds=False).squeeze()
-        maes.append(mean_absolute_error(y_test, y_pred))
-        r2s.append(r2_score(y_test, y_pred))
+        matbench_seed = 18012019
+        outer_cv = KFold(n_splits=5, shuffle=True, random_state=matbench_seed)
+        task_data = {}
 
-        # Store fold data in the dictionary with unique keys for each fold
-        task_data[f'f{j}_y_train_true'] = y_train.tolist()
-        task_data[f'f{j}_y_train_pred'] = y_train_pred.tolist()
-        task_data[f'f{j}_y_test_true'] = y_test.tolist()
-        task_data[f'f{j}_y_test_pred'] = y_pred.tolist()
+        # Train and evaluate the model for each fold in cross-validation
+        for j, (train_idx, test_idx) in enumerate(outer_cv.split(X_all), start=1):
+            X_train, X_test = X_all[train_idx], X_all[test_idx]
+            y_train, y_test = y_all[train_idx], y_all[test_idx]
+
+            cols = list(pd.DataFrame(X_train).columns)[:N_features]
+
+            # Wrap into MODData
+            md_tr = MODData(
+                df_featurized=pd.DataFrame(X_train[:, :N_features], columns=cols),
+                targets=pd.Series(y_train),
+                target_names=["g"]
+            )
+            md_tr.optimal_features = cols
+
+            md_te = MODData(
+                df_featurized=pd.DataFrame(X_test[:, :N_features], columns=cols),
+                targets=pd.Series(y_test),
+                target_names=["g"]
+            )
+            md_te.optimal_features = cols
+
+            # Build and fit the model
+            model = MODNetModel(
+                targets=[["g"]],
+                weights={"g": 1.0},
+                num_neurons=blocks,
+                n_feat=N_features,
+                num_classes={"g": 0},
+                out_act=out_act
+            )
+            model.fit(
+                md_tr,
+                batch_size=batch_size,
+                lr=lr,
+                loss=loss
+            )
+
+            # Predict and score
+            y_train_pred = model.predict(md_tr, remap_out_of_bounds=False).squeeze()
+            y_pred = model.predict(md_te, remap_out_of_bounds=False).squeeze()
+            maes.append(mean_absolute_error(y_test, y_pred))
+            r2s.append(r2_score(y_test, y_pred))
+
+            # Store fold data in the dictionary with unique keys for each fold
+            task_data[f'f{j}_y_train_true'] = y_train.tolist()
+            task_data[f'f{j}_y_train_pred'] = y_train_pred.tolist()
+            task_data[f'f{j}_y_test_true'] = y_test.tolist()
+            task_data[f'f{j}_y_test_pred'] = y_pred.tolist()
+
+            with open(output_path, "a") as out:
+                out.write(f"Task: {task} | Layer: {l} | Fold: {j} | MAE: {maes[-1]} | R2: {r2s[-1]}\n")
+
+            # Plot parity
+            plt.figure(figsize=(2.4, 2.4))
+            plt.scatter(y_train, y_train_pred, alpha=0.3, s=3)
+            plt.scatter(y_test, y_pred, alpha=0.3, s=3)
+            line_min = min(y_train.min(), y_train_pred.min(), y_test.min(), y_pred.min())
+            line_max = max(y_train.max(), y_train_pred.max(), y_test.max(), y_pred.max())
+            plt.plot([line_min, line_max], [line_min, line_max], 'k--', lw=1)
+            plt.xlabel("True")
+            plt.ylabel("Predicted")
+            plt.title(f"Task: {task} | Layer: {l} | Fold: {j} | MAE: {maes[-1]:.5f} | R²: {r2s[-1]:.5f}")
+            plt.legend(["Train", "Test"])
+            plt.tight_layout()
+            
+            plot_path = os.path.join(PARITY_DIR, f"parity_{task}_l{l}_f{j}.png")
+            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"[INFO] Parity plot saved for task {task}, layer {l}, fold {j}")
+
+            # Save fold-specific data to a pickle file after each fold
+            pickle_file = f'{PARITY_DIR}/parity_{task}_l{l}_f{j}.pkl'
+            with open(pickle_file, 'wb') as f:
+                pickle.dump(task_data, f)
+
+        # Write summary of the results
+        mean_mae = np.mean(maes)
+        std_mae = np.std(maes)
+        mean_r2 = np.mean(r2s)
+        std_r2 = np.std(r2s)
 
         with open(output_path, "a") as out:
-            out.write(f"Task: {i} | Layer: {l} | Fold: {j} | MAE: {maes[-1]} | R2: {r2s[-1]}\n")
+            out.write(f"Task: {task} | Layer: {l} | MAE: {mean_mae:.5f} ± {std_mae:.5f} | R2: {mean_r2:.5f} ± {std_r2:.5f}\n")
 
-        # Plot parity
-        plt.figure(figsize=(2.4, 2.4))
-        plt.scatter(y_train, y_train_pred, alpha=0.3, s=3)
-        plt.scatter(y_test, y_pred, alpha=0.3, s=3)
-        line_min = min(y_train.min(), y_train_pred.min(), y_test.min(), y_pred.min())
-        line_max = max(y_train.max(), y_train_pred.max(), y_test.max(), y_pred.max())
-        plt.plot([line_min, line_max], [line_min, line_max], 'k--', lw=1)
-        plt.xlabel("True")
-        plt.ylabel("Predicted")
-        plt.title(f"Task: {i} | Layer: {l} | Fold: {j} | MAE: {maes[-1]:.5f} | R²: {r2s[-1]:.5f}")
-        plt.legend(["Train", "Test"])
+    print("[INFO] All parity plots and results have been saved.")
 
-        mpl.rcParams['figure.dpi'] = 300
-        plt.rc('font', family='Arial', size=7)
-        plt.tight_layout()
-        
-        plot_path = os.path.join(out_dir, f"parity_t{i}_l{l}_f{j}.png")
-        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        print(f"[INFO] Parity plot saved for task {i}, layer {l}, fold {j}")
-
-        # Save fold-specific data to a pickle file after each fold
-        pickle_file = f'{out_dir}/parity_t{i}_l{l}_f{j}.pkl'
-        with open(pickle_file, 'wb') as f:
-            pickle.dump(task_data, f)
-
-    # Write summary of the results
-    mean_mae = np.mean(maes)
-    std_mae = np.std(maes)
-    mean_r2 = np.mean(r2s)
-    std_r2 = np.std(r2s)
-
-    with open(output_path, "a") as out:
-        out.write(f"Task: {i} | Layer: {l} | MAE: {mean_mae:.5f} ± {std_mae:.5f} | R2: {mean_r2:.5f} ± {std_r2:.5f}\n")
-
-print("[INFO] All parity plots and results have been saved.")
+if __name__ == '__main__':
+    main()

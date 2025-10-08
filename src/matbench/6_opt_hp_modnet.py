@@ -1,11 +1,9 @@
-# sciprt to optimize modnet hyper-parameters
-# env: python 3.9, pip install modnet, compatible with matbench
+# script to optimize modnet hyper-parameters
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"    # expose only physical GPU #1
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"    
 
 import tensorflow as tf
-# now the only GPU TF sees is "/GPU:0"
 gpus = tf.config.list_physical_devices("GPU")
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
@@ -34,53 +32,54 @@ from sklearn.model_selection import train_test_split, KFold
 from sklearn.metrics import mean_absolute_error
 from modnet.preprocessing import MODData
 from modnet.models import MODNetModel
+from run_benchmark import parse_task_list
+from pathlib import Path
 
-# ── settings ───────────────────────────────────────────────────
+DATA_ROOT = Path(os.environ.get("BENCH_DATA_DIR", Path(__file__).resolve().parent / "benchmark_data")).resolve()
+MLIP      = os.environ.get("BENCH_MLIP", "orb2")
+MODEL     = os.environ.get("BENCH_MODEL", "results_modnet")
+TASKS     = os.environ.get("BENCH_TASKS")
+
+# common dirs (suggestion: namespace by model)
+STRUCTURES_DIR = DATA_ROOT / "structures"
+META_DIR       = DATA_ROOT / "metadata"
+FEAT_DIR       = DATA_ROOT / f"feat_{MLIP}"
+NPY_DIR        = FEAT_DIR / "npy"
+RESULTS_DIR    = DATA_ROOT / MODEL
+HP_DIR         = RESULTS_DIR / "hp"
+PARITY_DIR     = RESULTS_DIR / "parity"
+
+for p in [STRUCTURES_DIR, META_DIR, FEAT_DIR, NPY_DIR, RESULTS_DIR, HP_DIR, PARITY_DIR]:
+    p.mkdir(parents=True, exist_ok=True)
+
 KEY        = "XPS"
 key        = KEY.lower()
-mlip       = "orb2"
-tasks      = [1]
-layers     = [4]
-data_dir   = f'/home/sokim/ion_conductivity/feat/matbench/{key}2feat_{mlip}'
-out_dir = os.path.join(data_dir, 'results_hp')
-os.makedirs(out_dir, exist_ok=True)
+L_MIN, L_MAX = 1, 15  # valid layer bounds
+n_trials   = 5            # total hyperparameter evaluations
 
-seed       = 42
-n_trials   = 50            # total hyperparameter evaluations
-
-# reproducibility
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark     = False
-
-print(f"Command-line arguments: {' '.join(sys.argv)}")
-
-# log the full source into the log file
-src_path = pathlib.Path(__file__).resolve()
-print(f"--- Begin source: {src_path.name} ---")
-print(src_path.read_text())
-print(f"--- End source: {src_path.name} ---")
+# data_dir   = f'/home/sokim/HackNIP/src/matbench/{key}2feat_{MLIP}'
+# out_dir = os.path.join(data_dir, 'modnet_results_hp')
+# os.makedirs(out_dir, exist_ok=True)
 
 # outer CV splitter
 matbench_seed = 18012019
 outer_cv = KFold(n_splits=5, shuffle=True, random_state=matbench_seed)
 
-def stop_when_no_improve(study, trial):
-    global no_improve, best_mae
-    if study.best_value < best_mae:
-        best_mae = study.best_value
-        no_improve = 0
-    else:
-        no_improve += 1
+def make_early_stop_callback(patience=10, atol=0.0):
+    state = {"best": float("inf"), "stale": 0}
+    def _cb(study, trial):
+        val = study.best_value
+        # improvement?
+        if val + atol < state["best"]:
+            state["best"] = val
+            state["stale"] = 0
+        else:
+            state["stale"] += 1
+            if state["stale"] >= patience:
+                print(f"[EarlyStop] No improvement for {state['stale']} trials → stopping.")
+                study.stop()
+    return _cb
 
-    if no_improve >= 10:
-        print(f"No improvement in {no_improve} trials; stopping study.")
-        study.stop()
-
-# ── objective for Optuna ──────────────────────────────────────
 def objective(trial, X_all, y_all):
     # 1) suggest hyperparameters
     batch_size    = trial.suggest_categorical("batch_size",    [16, 32, 128])
@@ -148,53 +147,87 @@ def objective(trial, X_all, y_all):
     # return the mean MAE across folds
     return mean_mae
 
-# ── run the study ───────────────────────────────────────────────
+def main():
 
-for i in tasks:
-    feat = pickle.load(open(os.path.join(data_dir, f't{i}_{KEY}_{mlip}.pkl'),'rb'))
-    master_csv = os.path.join(out_dir, f"t{i}_{KEY}_{mlip}_optuna.csv")
-    first = not os.path.exists(master_csv)
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    for gpu in tf.config.list_physical_devices("GPU"):
+        tf.config.experimental.set_memory_growth(gpu, True)
 
-    best_tasks = []
-    for l in layers:
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("PyTorch device:", device)
+    print("TensorFlow GPUs:", tf.config.list_logical_devices("GPU"))
 
-        no_improve = 0
-        best_mae  = float("inf")
-        X_all = feat[f'{KEY}_l{l}']
-        y_all = feat['targets']
+    # reproducibility
+    seed = 42
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark     = False
 
-        study = optuna.create_study(direction="minimize",
-                                    sampler=optuna.samplers.TPESampler(seed=seed))
-        study.optimize(lambda t: objective(t, X_all, y_all),
-                       n_trials=n_trials,
-                       n_jobs=4,
-                       callbacks=[stop_when_no_improve],
-                       show_progress_bar=True)
+    task_slugs = parse_task_list(TASKS)
 
-        # dump every trial if you like
-        study.trials_dataframe().to_csv(
-            os.path.join(out_dir, f"t{i}_l{l}_optuna.csv"), index=False
+    for task in task_slugs[:]:
+        feat = pickle.load(open(os.path.join(FEAT_DIR, f'{task}_{KEY}_{MLIP}.pkl'),'rb'))
+        score_path = Path(RESULTS_DIR) / "benchmark_scores.csv"
+        score_df = pd.read_csv(score_path)
+
+        row = score_df.loc[score_df["task"] == task]
+        base_layer = int(row.iloc[0]["layer"])
+
+        candidate_layers = list(range(
+            max(L_MIN, base_layer - 2),
+            min(L_MAX, base_layer + 2) + 1
+        ))
+
+    # find layer corresponding to the task in score_csv and test five adjacent layers for instance if layer  4 test 2,3,4,5,6, if layer 1 test 1,2,3
+        master_csv = os.path.join(HP_DIR, f"{task}_{KEY}_{MLIP}_optuna.csv")
+        first = not os.path.exists(master_csv)
+
+        best_tasks = []
+        for l in candidate_layers:
+
+            X_all = feat[f'{KEY}_l{l}']
+            y_all = feat['targets']
+
+            cb = make_early_stop_callback(patience=10)
+            study = optuna.create_study(direction="minimize",
+                                        sampler=optuna.samplers.TPESampler(seed=seed))
+            study.optimize(lambda t: objective(t, X_all, y_all),
+                        n_trials=n_trials,
+                        n_jobs=4,
+                        callbacks=[cb],
+                        show_progress_bar=True)
+
+            # dump every trial if you like
+            study.trials_dataframe().to_csv(
+                os.path.join(HP_DIR, f"{task}_l{l}_optuna.csv"), index=False
+            )
+
+            best = study.best_trial
+            rec = {"task":task, "layer":l,
+                "best_mae":best.value, "best_mae_std": best.user_attrs["mae_std"],"trial":best.number, **best.params}
+
+            # append only this layer’s record
+            pd.DataFrame([rec]).to_csv(
+                master_csv, mode="a", header=first, index=False
+            )
+            first = False
+
+            best_tasks.append(rec)
+            print(f"[task {task} l{l}] best MAE = {rec['best_mae']:.4f}")
+
+        # after all layers, record the best‐layer for this task
+        best_overall = min(best_tasks, key=lambda r: r["best_mae"])
+        task_csv = os.path.join(HP_DIR, f"benchmark_optuna.csv")
+        pd.DataFrame([best_overall]).to_csv(
+            task_csv,
+            mode="a",
+            header=not os.path.exists(task_csv),
+            index=False
         )
 
-        best = study.best_trial
-        rec = {"task":i, "layer":l,
-               "best_mae":best.value, "best_mae_std": best.user_attrs["mae_std"],"trial":best.number, **best.params}
-
-        # append only this layer’s record
-        pd.DataFrame([rec]).to_csv(
-            master_csv, mode="a", header=first, index=False
-        )
-        first = False
-
-        best_tasks.append(rec)
-        print(f"[task {i} l{l}] best MAE = {rec['best_mae']:.4f}")
-
-    # after all layers, record the best‐layer for this task
-    best_overall = min(best_tasks, key=lambda r: r["best_mae"])
-    task_csv = os.path.join(out_dir, f"benchmark_optuna.csv")
-    pd.DataFrame([best_overall]).to_csv(
-        task_csv,
-        mode="a",
-        header=not os.path.exists(task_csv),
-        index=False
-    )
+if __name__ == '__main__':
+    main()
