@@ -55,7 +55,7 @@ HackNIP/
 ## Installation
 ```
 conda create -n hacknip python=3.9
-conda activate ionic
+conda activate hacknip
 pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu121
 pip install  dgl -f https://data.dgl.ai/wheels/torch-2.4/cu121/repo.html
 pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.4.0+cu121.html
