@@ -1,6 +1,7 @@
 
 import pandas as pd
 import numpy as np
+import os
 from tqdm import tqdm
 import pickle
 import argparse
@@ -215,6 +216,12 @@ def main(args):
     # -------------------------------
     # Open a file to write outputs
     output_file = f"output/output_{data_path.split('/')[-1].split('.')[0]}_decode.txt"
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+    if not os.path.exists(output_file):
+        with open(output_file, 'w') as f:
+            pass  
     with open(output_file, "w") as out:
         with open(data_path, 'rb') as f:
             data = pickle.load(f)
