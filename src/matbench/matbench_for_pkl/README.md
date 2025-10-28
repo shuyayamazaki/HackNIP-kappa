@@ -2,14 +2,14 @@
 
 This folder contains a five-stage pipeline for turning MatBench-style split pickles into MODNet models trained on ORB2 supercell features. Each stage is implemented as a standalone Python entry point (`1_*.py` – `5_*.py`). 
 
-> **Environment note:**  
-> Set up the Python environment separately (see the project-level README).  
-> The commands below assume the environment already provides ASE, ORB models, MODNet, TensorFlow, PyTorch, and Optuna.  
->  
-> The base environment does not include them, so install the required packages manually:
-> ```bash
-> pip install modnet optuna
-> ```
+**Environment note:**  
+Set up the Python environment separately (see the project-level README).  
+The commands below assume the environment already provides ASE, ORB models, MODNet, TensorFlow, PyTorch, and Optuna.  
+  
+The base environment does not include them, so install the required packages manually:
+```bash
+pip install modnet optuna
+```
 
 ## 0. Prepare inputs
 - **Split pickle:** e.g. `ood_split_dedup_w_min_freq.pkl.gz` containing `X_train`, `X_test`, `Y_train`, … blocks with `mp_ids`.
