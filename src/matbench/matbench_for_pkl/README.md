@@ -4,7 +4,7 @@ This folder contains a five-stage pipeline for turning MatBench-style split pick
 
 **Environment note:**  
 Set up the Python environment separately (see the project-level README).  
-The commands below assume the environment already provides ASE, ORB models, MODNet, TensorFlow, PyTorch, and Optuna.  
+The commands below assume the environment already provides ASE, ORB models, MODNet, TensorFlow, and PyTorch.  
   
 The base environment does not include them, so install the required packages manually:
 ```bash
@@ -12,8 +12,11 @@ pip install modnet optuna
 ```
 
 ## 0. Prepare inputs
-- **Split pickle:** e.g. `ood_split_dedup_w_min_freq.pkl.gz` containing `X_train`, `X_test`, `Y_train`, … blocks with `mp_ids`.
-- **Base structures:** directory of `{mpid}.cif` files referenced by the pickle.
+- **Split pickle:** e.g. `random_split_dedup_w_min_freq.pkl.gz` containing `X_train`, `X_test`, `Y_train`, … blocks with `mp_ids`.
+- **Base structures:** directory of `{mpid}.cif` files referenced by the pickle.  
+  Recommended: use the dataset `Dataset_thermoconductivity_pred/processed_splits/apdb_min_freq.tar.gz` with the following command:
+  ```bash
+  tar -xvzf Dataset_thermoconductivity_pred/processed_splits/apdb_min_freq.tar.gz -C <target_directory>
 - **Output root:** a writable directory (default is `<pickle_dir>/benchmark_data`). The scripts expect the layout created during step 1, so keep all steps pointed at the same root.
 
 ## 1. Build supercells (`1_build_supercells_from_pkl.py`)
