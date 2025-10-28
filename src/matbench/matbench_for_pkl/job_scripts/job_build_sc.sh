@@ -1,64 +1,67 @@
 #!/bin/bash
-#SBATCH -p gpu_short                 # GPU不要ならCPU系パーティションに変更可（例: cpu_short）
-##SBATCH --gres=gpu:1                # 必要ならコメント解除
-#SBATCH --cpus-per-task=52           # このジョブはCPU中心（I/O主体）。過剰なら減らしてOK
-#SBATCH -n 1
-#SBATCH -t 4:00:00
-#SBATCH -J SUPER_XPS                 # ジョブ名
-#SBATCH --output=output_script/%x-%j.out
-#SBATCH --error=output_script/%x-%j.err
+#SBATCH -p gpu_short                 # Partition/queue (change to cpu_short if GPU is not required)
+##SBATCH --gres=gpu:1                # Uncomment if GPU is needed
+#SBATCH --cpus-per-task=52           # Number of CPU cores (I/O-heavy job; reduce if excessive)
+#SBATCH -n 1                         # One task (no MPI)
+#SBATCH -t 4:00:00                   # Time limit: 4 hours
+#SBATCH -J SUPER_XPS                 # Job name
+#SBATCH --output=output_script/%x-%j.out  # Standard output log
+#SBATCH --error=output_script/%x-%j.err   # Standard error log
 
+# Fail fast: exit on errors, undefined vars, or pipe failures
 set -euo pipefail
 
-# スレッド制御（過剰並列の抑制）
+# ---------------- Threading control ----------------
+# Prevent oversubscription in linear-algebra backends
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
-export PYTHONUNBUFFERED=1
+export PYTHONUNBUFFERED=1   # Flush Python output immediately for real-time logging
 
-# ログ出力ディレクトリ
+# ---------------- Log directory --------------------
 mkdir -p output_script
 
-# (任意) GPU情報・CUDAモジュール確認（GPU未使用でも harmless）
+# (Optional) Display GPU info or available CUDA modules
+# Safe even when running on CPU nodes
 nvidia-smi || true
 module avail cuda || true
 
-date
+date  # Print start timestamp
 
-# ==== 環境の有効化（あなたの環境に合わせて必要なら修正）====
-# conda を使う場合
+# ================= Environment activation =================
+# Activate your Python environment (adjust to your setup)
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate hacknip
 
-# ==== 入力/出力パスの設定 ====
+# ================= Input / output paths ===================
 PICKLE_PATH="/work/y-tomiya/ntu/Dataset_thermoconductivity_pred/processed_splits/dedup_w_apdb_splits/ood_split_dedup_w_min_freq.pkl.gz"
 STRUCTURES_DIR="/work/y-tomiya/ntu/Dataset_thermoconductivity_pred/processed_splits/apdb_min_freq/structures"
 OUTPUT_DIR="/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data"
 
-# supercell の最小ベクトル長(Å)の目標値（--target_length）
+# Target minimal supercell vector length (Å)
 TARGET_LENGTH="10.0"
 
-# 任意: データセット名を固定したい場合は設定（未設定ならpickle名から自動推定）
+# Optional: manually fix dataset slug name (auto-inferred from pickle if empty)
 DATASET_SLUG=""
 
-# 物性カラム（--property_cols）: 例では log_klat をターゲットとして使用
+# Property column(s) to include (example: predicting log_klat)
 PROPERTY_COLS=(log_klat)
 
-# ==== 実行コマンド ====
-# Pythonスクリプトのパス（リポジトリ構成に合わせて調整）
+# ================= Python execution command =================
+# Adjust path to match your repository structure
 PY_SCRIPT="src/matbench/build_supercells_from_pkl.py"
 
 CMD=( python "${PY_SCRIPT}"
-  --pickle_path "${PICKLE_PATH}"
-  --structures_dir "${STRUCTURES_DIR}"
-  --output_dir "${OUTPUT_DIR}"
-  --target_length "${TARGET_LENGTH}"
-  --property_cols "${PROPERTY_COLS[@]}"
-  # --skip_base_traj                 # ベース構造(_XP.traj)を出力しない場合はコメント解除
+  --pickle_path "${PICKLE_PATH}"          # Input pickle file (.pkl or .pkl.gz)
+  --structures_dir "${STRUCTURES_DIR}"    # Directory where supercell .traj files are saved
+  --output_dir "${OUTPUT_DIR}"            # Root directory for generated data (metadata/structures)
+  --target_length "${TARGET_LENGTH}"      # Target supercell vector length
+  --property_cols "${PROPERTY_COLS[@]}"   # Target property column(s)
+  # --skip_base_traj                      # Uncomment to skip saving base structure (_XP.traj)
 )
 
-# dataset_slug を使う場合のみ付与
+# Append dataset slug argument only if specified
 if [[ -n "${DATASET_SLUG}" ]]; then
   CMD+=( --dataset_slug "${DATASET_SLUG}" )
 fi
@@ -66,7 +69,8 @@ fi
 echo "[INFO] Command: ${CMD[*]}"
 echo "[INFO] Output root (metadata/structures): ${OUTPUT_DIR}"
 
-# srun で1タスク実行
+# ================= Launch job =================
+# Use srun for a single CPU task (core binding for consistency)
 srun --cpu-bind=cores "${CMD[@]}"
 
-date
+date  # Print end timestamp
