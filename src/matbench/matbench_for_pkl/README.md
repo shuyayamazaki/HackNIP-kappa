@@ -1,15 +1,20 @@
 # matbench_for_pkl Workflow
 
-This folder contains a five-stage pipeline for turning MatBench-style split pickles into MODNet models trained on ORB2 supercell features. Each stage is implemented as a standalone Python entry point (`1_*.py` – `5_*.py`). Companion SLURM launchers under `HackNIP/job_*.sh` show how the scripts are wired together on the NAIST cluster; the examples below paraphrase those launchers so you can run the same logic in any environment.
+This folder contains a five-stage pipeline for turning MatBench-style split pickles into MODNet models trained on ORB2 supercell features. Each stage is implemented as a standalone Python entry point (`1_*.py` – `5_*.py`). 
 
-> **Environment note:** set up the Python environment separately (see the project-level README). The commands below assume the environment already provides ASE, ORB models, MODNet, TensorFlow, PyTorch, Optuna, etc.
+> **Environment note:**  
+> Set up the Python environment separately (see the project-level README).  
+> The commands below assume the environment already provides ASE, ORB models, MODNet, TensorFlow, PyTorch, and Optuna.  
+>  
+> The base environment does not include them, so install the required packages manually:
+> ```bash
+> pip install modnet optuna
+> ```
 
 ## 0. Prepare inputs
 - **Split pickle:** e.g. `ood_split_dedup_w_min_freq.pkl.gz` containing `X_train`, `X_test`, `Y_train`, … blocks with `mp_ids`.
 - **Base structures:** directory of `{mpid}.cif` files referenced by the pickle.
 - **Output root:** a writable directory (default is `<pickle_dir>/benchmark_data`). The scripts expect the layout created during step 1, so keep all steps pointed at the same root.
-
-The SLURM template `job_build_sc.sh` shows concrete NAIST paths (`/work/y-tomiya/...`); replace them with your own locations.
 
 ## 1. Build supercells (`1_build_supercells_from_pkl.py`)
 Generates ASE trajectory files for base and supercell structures plus metadata pickles per split and for the full dataset.
