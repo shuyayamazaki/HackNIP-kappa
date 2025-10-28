@@ -10,6 +10,9 @@ The base environment does not include them, so install the required packages man
 ```bash
 pip install modnet optuna
 ```
+### Job scripts
+Example SLURM job scripts for each stage are provided in the job_scripts folder.
+Please refer to them as needed and modify the parameters according to your system and data paths.
 
 ## 0. Prepare inputs
 - **Split pickle:** e.g. `random_split_dedup_w_min_freq.pkl.gz` containing `X_train`, `X_test`, `Y_train`, … blocks with `mp_ids`.
