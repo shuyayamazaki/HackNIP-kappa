@@ -25,7 +25,7 @@ Please refer to them as needed and modify the parameters according to your syste
 ## 1. Build supercells (`1_build_supercells_from_pkl.py`)
 Generates ASE trajectory files for base and supercell structures plus metadata pickles per split and for the full dataset.
 
-Key options (see `job_build_sc.sh`):
+Key options (see `job_scripts/job_build_sc.sh`):
 ```bash
 python 1_build_supercells_from_pkl.py \
   --pickle_path /path/to/ood_split_dedup_w_min_freq.pkl.gz \
@@ -41,7 +41,7 @@ python 1_build_supercells_from_pkl.py \
 ## 2. Featurize + assemble pickles (`2_featurize_construct_from_supercells.py`)
 Reads the trajectories/metadata from step 1, runs ORB2 to build layer-wise features, and emits MODNet-friendly pickles and NumPy caches.
 
-Example based on `job_featurize_construct_supercells.sh`:
+Example based on `job_scripts/job_featurize_construct_supercells.sh`:
 ```bash
 python 2_featurize_construct_from_supercells.py \
   --slug ood_split_dedup_w_min_freq \
@@ -57,7 +57,7 @@ python 2_featurize_construct_from_supercells.py \
 ## 3. Train baseline MODNet (`3_train_modnet_from_supercells.py`)
 Consumes the feature pickles and evaluates each available layer on a fixed train/test split. Optionally retrains the best layer on the full dataset and saves the model.
 
-The SLURM helper `job_train_modnet_supercells.sh` exports several environment variables (`BENCH_DATA_DIR`, `BENCH_MLIP`, `BENCH_MODEL`, `BENCH_FEATURE_SLUGS`). You can either export them yourself or pass explicit flags:
+The SLURM helper `job_scripts/job_train_modnet_supercells.sh` exports several environment variables (`BENCH_DATA_DIR`, `BENCH_MLIP`, `BENCH_MODEL`, `BENCH_FEATURE_SLUGS`). You can either export them yourself or pass explicit flags:
 ```bash
 export BENCH_DATA_DIR=/path/to/benchmark_data
 export BENCH_MLIP=orb2
@@ -77,7 +77,7 @@ python 3_train_modnet_from_supercells.py \
 - Metrics and logs mirror the outputs in `output_script/` from the SLURM run.
 
 ## 4. Hyperparameter optimisation (`4_opt_hp_modnet_from_supercells.py`)
-Runs Optuna over the MODNet configuration for one or more layers, saving trial logs and best-model metadata. The template `job_opt_hp_supercells.sh` demonstrates a long-running GPU job.
+Runs Optuna over the MODNet configuration for one or more layers, saving trial logs and best-model metadata. The template `job_scripts/job_opt_hp_supercells.sh` demonstrates a long-running GPU job.
 
 Typical invocation:
 ```bash
@@ -103,7 +103,7 @@ python 4_opt_hp_modnet_from_supercells.py \
 - Outputs include Optuna study CSV/JSON files and serialized trial models under `<results_modnet>/training_dataset_<slug>_<timestamp>/`.
 
 ## 5. Transfer hyperparameters (`5_retrain_hp_model_transfer.py`)
-Reuses the best Optuna configuration to retrain on additional dataset splits. `job_retrain_hp_transfer_supercells.sh` shows how to point at the `metadata.json` from step 4 and fan out to new slugs.
+Reuses the best Optuna configuration to retrain on additional dataset splits. `job_scripts/job_retrain_hp_transfer_supercells.sh` shows how to point at the `metadata.json` from step 4 and fan out to new slugs.
 
 Example:
 ```bash
@@ -124,7 +124,7 @@ python 5_retrain_hp_model_transfer.py \
 - When `--save-models` is omitted the script still records metrics in `metrics.csv`.
 
 ## Running via SLURM
-All job scripts under `HackNIP/job_*.sh` follow the same pattern:
+All job scripts under `job_scripts/job_*.sh` follow the same pattern:
 - Load modules, activate the `hacknip` conda environment, and export thread-safety variables.
 - Define dataset paths and pass them to one of the Python entry points above.
 - Call the script through `srun` so SLURM manages CPU/GPU resources.
