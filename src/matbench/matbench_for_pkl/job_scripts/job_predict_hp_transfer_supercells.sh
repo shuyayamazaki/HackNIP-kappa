@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH -p gpu_long
+#SBATCH -p gpu_short
 #SBATCH --gres=gpu:1
-##SBATCH --cpus-per-task=12
+##SBATCH --cpus-per-task=8
 #SBATCH -n 1
-#SBATCH -t 100:00:00
-#SBATCH -J ORB2_TUNE_SUPER
+#SBATCH -t 1:30:00
+#SBATCH -J ORB2_PRED_TRANSFER
 #SBATCH --output=output_script/%x-%j.out
 #SBATCH --error=output_script/%x-%j.err
 
@@ -30,8 +30,6 @@ export LD_LIBRARY_PATH="$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}"
 export XLA_FLAGS="--xla_gpu_cuda_data_dir=$CUDA_HOME"
 
 nvidia-smi || true
-ls "$CUDA_HOME/nvvm/libdevice"/libdevice*.bc 2>/dev/null || \
-  echo "[WARN] libdevice not found under $CUDA_HOME/nvvm/libdevice"
 
 date
 
@@ -40,59 +38,50 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate hacknip
 
 # ---- Job params ----
-PY_SCRIPT="../4_opt_hp_modnet_from_supercells.py"
+PY_SCRIPT="../5_2_predict_hp_model_transfer.py"
 DATA_ROOT="/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data"
 MLIP="orb2"
 MODEL="modnet"
-DATASET_SLUG="ood_split_dedup_w_min_freq"
+TARGET_SLUGS="random_split_dedup_w_min_freq"
 TRAIN_SPLIT="train"
 TEST_SPLIT="test"
 CUDA_VISIBLE="0"
-SEED="42"
-N_TRIALS="60"
-CV_FOLDS="5"
-N_JOBS="1"
-SAMPLER="tpe"
-EARLY_STOP="20"
-SPLIT_TYPE="ood"
-TIME="20251027_094124"
-LAYER="l8"
-# Path to the model produced by train_modnet_from_supercells.py
-TRAINED_MODEL_PATH="${DATA_ROOT}/feat_${MLIP}/results_${MODEL}/training_dataset_${SPLIT_TYPE}_split_dedup_w_min_freq_${TIME}/trained_models/layers_${TRAIN_SPLIT}2${TEST_SPLIT}/${SPLIT_TYPE}_split_dedup_w_min_freq_${TRAIN_SPLIT}2${TEST_SPLIT}_XPS_${MLIP}_${LAYER}.modnet"
-TARGET_LAYER="8"
+
+# Path to metadata produced by opt/retrain scripts (must include layer/key/n_features info)
+METADATA_PATH="/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data/feat_orb2/results_modnet/best_models/random_split_dedup_w_min_freq/train2test/l11/metadata.json"
+
+# Path to the trained model to reuse (update as needed)
+MODEL_PATH="/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data/feat_orb2/results_modnet/best_models/random_split_dedup_w_min_freq/train2test/l11/model.modnet"
+
+OUTPUT_DIR=""  # e.g., "hp_transfer_predictions/custom_run"; leave empty to use timestamped default
 
 export BENCH_DATA_DIR="${DATA_ROOT}"
 export BENCH_MLIP="${MLIP}"
 export BENCH_MODEL="${MODEL}"
-export BENCH_TASKS=""
-export BENCH_FEATURE_SLUGS="${DATASET_SLUG}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE}"
 
 echo "[INFO] DATA_ROOT=${DATA_ROOT}"
-echo "[INFO] DATASET_SLUG=${DATASET_SLUG}"
+echo "[INFO] TARGET_SLUGS=${TARGET_SLUGS}"
+echo "[INFO] METADATA_PATH=${METADATA_PATH}"
+echo "[INFO] MODEL_PATH=${MODEL_PATH}"
 echo "[INFO] TRAIN_SPLIT=${TRAIN_SPLIT}, TEST_SPLIT=${TEST_SPLIT}"
 echo "[INFO] CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE}"
 echo "[INFO] PY_SCRIPT=${PY_SCRIPT}"
-echo "[INFO] N_TRIALS=${N_TRIALS}, CV_FOLDS=${CV_FOLDS}, EARLY_STOP=${EARLY_STOP}"
-echo "[INFO] TRAINED_MODEL_PATH=${TRAINED_MODEL_PATH}"
-echo "[INFO] TARGET_LAYER=${TARGET_LAYER}"
 
 PY_BIN="$(command -v python)"
 CMD=(
   "${PY_BIN}" "${PY_SCRIPT}"
-  --feature-slugs "${DATASET_SLUG}"
+  --metadata-path "${METADATA_PATH}"
+  --model-path "${MODEL_PATH}"
+  --target-slugs "${TARGET_SLUGS}"
   --train-split "${TRAIN_SPLIT}"
   --test-split "${TEST_SPLIT}"
-  --seed "${SEED}"
   --cuda-visible-devices "${CUDA_VISIBLE}"
-  --n-trials "${N_TRIALS}"
-  --cv-folds "${CV_FOLDS}"
-  --n-jobs "${N_JOBS}"
-  --sampler "${SAMPLER}"
-  --early-stop-trials "${EARLY_STOP}"
-  --trained-model-path "${TRAINED_MODEL_PATH}"
-  --layer "${TARGET_LAYER}"
 )
+
+if [[ -n "${OUTPUT_DIR}" ]]; then
+  CMD+=(--output-dir "${OUTPUT_DIR}")
+fi
 
 echo "[INFO] PY_BIN=${PY_BIN}"
 echo "[INFO] Command: ${CMD[*]}"
