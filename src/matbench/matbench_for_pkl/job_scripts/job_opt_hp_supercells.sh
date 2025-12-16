@@ -40,7 +40,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate hacknip
 
 # ---- Job params ----
-PY_SCRIPT="src/matbench/opt_hp_modnet_from_supercells.py"
+PY_SCRIPT="../4_opt_hp_modnet_from_supercells.py"
 DATA_ROOT="/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data"
 MLIP="orb2"
 MODEL="modnet"
