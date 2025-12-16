@@ -15,7 +15,7 @@ export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
-export PYTHONUNBUFFERED=1
+export PYTHONUNBUFFERED=1   # Flush Python output immediately for real-time logging
 
 # Log output directory
 mkdir -p output_script
@@ -24,7 +24,7 @@ mkdir -p output_script
 nvidia-smi || true
 module avail cuda || true
 
-date
+date  # Print start timestamp
 
 # ==== Activate environment (modify if needed for your setup) ====
 # When using conda
