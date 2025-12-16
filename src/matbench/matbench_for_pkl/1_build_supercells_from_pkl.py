@@ -133,7 +133,9 @@ def extract_properties_for_split(
         if values is None:
             raise KeyError(
                 f"Unable to locate property '{prop}' for split '{logical_split}'. "
-                f"Tried keys: {y_keys + candidate_keys}."
+                f"Tried keys: {y_keys + candidate_keys}. "
+                f"Available property-like keys: "
+                f"{[k for k in dataset.keys() if k.lower().startswith('y_') or k.lower().endswith(('_train', '_test', '_val', '_valid'))][:10]}"
             )
         results[prop] = [float(v) for v in values]
     return results
@@ -330,17 +332,12 @@ def main():
     print(f"[INFO] Metadata directory: {metadata_dir}")
     print(f"[INFO] Structures directory: {structures_dir}")
 
-    base_atoms, super_atoms = prepare_atoms_for_pool(
-        mp_ids=mpid_pool,
-        base_structures_dir=args.structures_dir,
-        target_length=args.target_length,
-    )
-
+    # Validate and cache properties before heavy structure I/O to fail fast on bad configs.
     property_lookup: Dict[str, Dict[str, float]] = {prop: {} for prop in property_cols}
-
+    split_properties: Dict[Tuple[str, str], Dict[str, List[float]]] = {}
     for raw_split, logical_split, mp_ids in splits:
-        print(f"[INFO] Writing split '{logical_split}' ({len(mp_ids)} structures)")
         properties = extract_properties_for_split(dataset, raw_split, logical_split, property_cols)
+        split_properties[(raw_split, logical_split)] = properties
         for prop, values in properties.items():
             if len(values) != len(mp_ids):
                 raise ValueError(
@@ -350,6 +347,16 @@ def main():
             lookup = property_lookup.setdefault(prop, {})
             for mpid, value in zip(mp_ids, values):
                 lookup[str(mpid)] = float(value)
+
+    base_atoms, super_atoms = prepare_atoms_for_pool(
+        mp_ids=mpid_pool,
+        base_structures_dir=args.structures_dir,
+        target_length=args.target_length,
+    )
+
+    for raw_split, logical_split, mp_ids in splits:
+        print(f"[INFO] Writing split '{logical_split}' ({len(mp_ids)} structures)")
+        properties = split_properties[(raw_split, logical_split)]
 
         base_seq = [base_atoms[str(mpid)] for mpid in mp_ids] if not args.skip_base_traj else []
         super_seq = [super_atoms[str(mpid)] for mpid in mp_ids]

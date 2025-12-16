@@ -1,53 +1,53 @@
 #!/bin/bash
-#SBATCH -p gpu_short                 # GPU不要ならCPU系パーティションに変更可（例: cpu_short）
-##SBATCH --gres=gpu:1                # 必要ならコメント解除
-#SBATCH --cpus-per-task=52           # このジョブはCPU中心（I/O主体）。過剰なら減らしてOK
+#SBATCH -p gpu_long                 # If GPU is not needed, you can switch to a CPU partition (e.g., cpu_short)
+##SBATCH --gres=gpu:1                # Uncomment if a GPU is required
+#SBATCH --cpus-per-task=52           # This job is CPU-centric (mainly I/O-bound). Reduce if excessive.
 #SBATCH -n 1
 #SBATCH -t 4:00:00
-#SBATCH -J SUPER_XPS                 # ジョブ名
+#SBATCH -J SUPER_XPS                 # Job name
 #SBATCH --output=output_script/%x-%j.out
 #SBATCH --error=output_script/%x-%j.err
 
 set -euo pipefail
 
-# スレッド制御（過剰並列の抑制）
+# Thread control (prevent oversubscription)
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 export PYTHONUNBUFFERED=1
 
-# ログ出力ディレクトリ
+# Log output directory
 mkdir -p output_script
 
-# (任意) GPU情報・CUDAモジュール確認（GPU未使用でも harmless）
+# (Optional) Check GPU info / CUDA modules (harmless even if GPU is unused)
 nvidia-smi || true
 module avail cuda || true
 
 date
 
-# ==== 環境の有効化（あなたの環境に合わせて必要なら修正）====
-# conda を使う場合
+# ==== Activate environment (modify if needed for your setup) ====
+# When using conda
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate hacknip
 
-# ==== 入力/出力パスの設定 ====
-PICKLE_PATH="/work/y-tomiya/ntu/Dataset_thermoconductivity_pred/processed_splits/dedup_w_apdb_splits/ood_split_dedup_w_min_freq.pkl.gz"
+# ==== Input / Output paths ====
+PICKLE_PATH="/work/y-tomiya/ntu/Dataset_thermoconductivity_pred/processed_splits/dedup_w_apdb_splits/apdb_min_freq_ddp_fc2_0.05_stable_-0.001_v2_cls.pkl.gz"
 STRUCTURES_DIR="/work/y-tomiya/ntu/Dataset_thermoconductivity_pred/processed_splits/apdb_min_freq/structures"
 OUTPUT_DIR="/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data"
 
-# supercell の最小ベクトル長(Å)の目標値（--target_length）
+# Target minimum supercell vector length (Å) for --target_length
 TARGET_LENGTH="10.0"
 
-# 任意: データセット名を固定したい場合は設定（未設定ならpickle名から自動推定）
+# Optional: set dataset name explicitly (if empty, inferred automatically from the pickle name)
 DATASET_SLUG=""
 
-# 物性カラム（--property_cols）: 例では log_klat をターゲットとして使用
-PROPERTY_COLS=(log_klat)
+# Property columns (--property_cols): in this dataset, log_klat etc. are stored as y_train_log_klat, etc.
+PROPERTY_COLS=(is_stable)
 
-# ==== 実行コマンド ====
-# Pythonスクリプトのパス（リポジトリ構成に合わせて調整）
-PY_SCRIPT="src/matbench/build_supercells_from_pkl.py"
+# ==== Execution command ====
+# Path to the Python script (adjust according to repository structure)
+PY_SCRIPT="../1_build_supercells_from_pkl.py"
 
 CMD=( python "${PY_SCRIPT}"
   --pickle_path "${PICKLE_PATH}"
@@ -55,10 +55,10 @@ CMD=( python "${PY_SCRIPT}"
   --output_dir "${OUTPUT_DIR}"
   --target_length "${TARGET_LENGTH}"
   --property_cols "${PROPERTY_COLS[@]}"
-  # --skip_base_traj                 # ベース構造(_XP.traj)を出力しない場合はコメント解除
+  # --skip_base_traj                 # Uncomment to skip output of base structures (_XP.traj)
 )
 
-# dataset_slug を使う場合のみ付与
+# Append dataset_slug only if specified
 if [[ -n "${DATASET_SLUG}" ]]; then
   CMD+=( --dataset_slug "${DATASET_SLUG}" )
 fi
@@ -66,7 +66,7 @@ fi
 echo "[INFO] Command: ${CMD[*]}"
 echo "[INFO] Output root (metadata/structures): ${OUTPUT_DIR}"
 
-# srun で1タスク実行
+# Run as a single task with srun
 srun --cpu-bind=cores "${CMD[@]}"
 
 date
