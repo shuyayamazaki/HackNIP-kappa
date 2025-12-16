@@ -112,6 +112,67 @@ python 5_retrain_hp_model_transfer.py \
 - `--output-dir` overrides the default results folder (`.../hp_transfer_retrain/<metadata>_<timestamp>`).
 - When `--save-models` is omitted the script still records metrics in `metrics.csv`.
 
+## Binary classification workflow
+The same supercell/feature generation steps (1 and 2) apply; ensure your target column is binary (0/1). The default target name is `cls`.
+
+- Train/evaluate per layer:
+  ```bash
+  export BENCH_DATA_DIR=/path/to/benchmark_data
+  export BENCH_MLIP=orb2
+  export BENCH_MODEL=modnet
+
+  python 3_2_train_modnet_from_supercells_binary.py \
+    --feature-slugs random_split_dedup_w_min_freq \
+    --train-split train --test-split test \
+    --layer 8 --seed 42 --train-final \
+    --final-model-path /path/to/benchmark_data/feat_orb2/results_modnet/trained_models
+  ```
+  Produces layer-wise metrics (ACC/F1/AUC) and optional final models under `trained_models/`.
+- Hyperparameter search (adds trial CSVs and prediction dumps):
+  ```bash
+  export BENCH_DATA_DIR=/path/to/benchmark_data
+  export BENCH_MLIP=orb2
+  export BENCH_MODEL=modnet
+
+  python 4_3_opt_hp_modnet_from_supercells_binary.py \
+    --feature-slugs random_split_dedup_w_min_freq \
+    --train-split train --test-split test \
+    --layer 8 --n-trials 60 --seed 42 --cuda-visible-devices 0
+  ```
+  Use `4_4_opt_hp_modnet_from_supercells_binary_with_preds.py` if you want train/test prediction CSVs (prob_0/prob_1/pred_label) alongside the Optuna study.
+
+## Predicting on arbitrary datasets
+For inference-only CIF tables, you can build supercells + features and then run a trained model:
+
+- One-shot supercell + feature build (expects columns `file_id`, `generation_id`, `cif`):
+  ```bash
+  python predict_from_dataset_pkl.py \
+    --dataset /path/to/generated_dataset.pkl \
+    --slug newset --output-dir /path/to/prediction_data \
+    --device auto --mlip orb2
+  ```
+  Outputs trajectories under `prediction_data/structures`, metadata under `prediction_data/metadata`, per-layer npy features under `prediction_data/feat_orb2/npy`, and a packed bundle `prediction_data/feat_orb2/newset_XPS_orb2_pred.pkl`.
+- If your input is just a CSV/pickle with a `cif` column, run `1_1_build_supercelss_from_pkl_arbital.py` then `2_1_featurize_construct_from_supercells_arbital.py` to produce the same feature bundle.
+- Generate predictions with a trained model (use npy mode so the plain bundles work):
+  - Regression:
+    ```bash
+    python predict_from_packed_supercell_features_regression.py \
+      --model /path/to/model.modnet \
+      --npy /path/to/prediction_data/feat_orb2/npy/newset_all_XPS_l8.npy \
+      --meta-pickle /path/to/prediction_data/metadata/newset_meta.pkl \
+      --meta-id-key ids --id-column uid --layer 8
+    ```
+  - Classification (binary/multi-class):
+    ```bash
+    python predict_from_packed_supercell_features.py \
+      --model /path/to/layers_train2test_cls/<slug>_..._l8_cls.modnet \
+      --npy /path/to/prediction_data/feat_orb2/npy/newset_all_XPS_l8.npy \
+      --meta-pickle /path/to/prediction_data/metadata/newset_meta.pkl \
+      --mp-ids-path /path/to/id_list.txt \
+      --layer 8
+    ```
+  The meta pickle holds `ids` and `generation_id`; dump the ids to a text file if you want to pass them via `--mp-ids-path`. For classification, pass that file if you want custom ids; otherwise the CSV uses sequential ids. Both predictors also accept packed features (`--features <...>.pkl[.gz]`) when the payload contains split blocks (`X_train`, `X_test`, …).
+
 ## Running via SLURM
 All job scripts under `HackNIP/job_*.sh` follow the same pattern:
 - Load modules, activate the `hacknip` conda environment, and export thread-safety variables.
