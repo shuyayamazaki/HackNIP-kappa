@@ -31,3 +31,24 @@ orb-models/
 # cache
 *.pyc
 orb-models
+
+# data
+benchmark_data/
+prediction_data/
+
+# outputs
+output/
+output_script/
+
+# HPC / logs
+*.out
+*.err
+
+# python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# env
+.env
+
