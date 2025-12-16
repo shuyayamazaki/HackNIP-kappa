@@ -58,7 +58,7 @@ conda activate hacknip
 
 # ---------------------- Job parameters -------------------------
 # Main training script
-PY_SCRIPT="src/matbench/train_modnet_from_supercells.py"
+PY_SCRIPT="../3_train_modnet_from_supercells.py"
 
 # Dataset root prepared by your pipeline
 DATA_ROOT="/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data"
