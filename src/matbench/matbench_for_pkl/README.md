@@ -167,22 +167,13 @@ For inference-only CIF tables, you can build supercells + features and then run 
 - Generate predictions with a trained model (use npy mode so the plain bundles work):
   - Regression:
     ```bash
-    python predict_from_packed_supercell_features_regression.py \
+    python 6_predict_from_packed_supercell_features_regression.py \
       --model /path/to/model.modnet \
       --npy /path/to/prediction_data/feat_orb2/npy/newset_all_XPS_l8.npy \
       --meta-pickle /path/to/prediction_data/metadata/newset_meta.pkl \
       --meta-id-key ids --id-column uid --layer 8
     ```
-  - Classification (binary/multi-class):
-    ```bash
-    python predict_from_packed_supercell_features.py \
-      --model /path/to/layers_train2test_cls/<slug>_..._l8_cls.modnet \
-      --npy /path/to/prediction_data/feat_orb2/npy/newset_all_XPS_l8.npy \
-      --meta-pickle /path/to/prediction_data/metadata/newset_meta.pkl \
-      --mp-ids-path /path/to/id_list.txt \
-      --layer 8
-    ```
-  The meta pickle holds `ids` and `generation_id`; dump the ids to a text file if you want to pass them via `--mp-ids-path`. For classification, pass that file if you want custom ids; otherwise the CSV uses sequential ids. Both predictors also accept packed features (`--features <...>.pkl[.gz]`) when the payload contains split blocks (`X_train`, `X_test`, …).
+  - Classification not yet
 
 ## Running via SLURM
 All job scripts under `job_scripts/job_*.sh` follow the same pattern:
