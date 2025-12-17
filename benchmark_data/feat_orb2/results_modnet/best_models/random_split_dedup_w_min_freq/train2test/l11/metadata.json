@@ -1,0 +1,38 @@
+{
+  "dataset": "random_split_dedup_w_min_freq",
+  "train_split": "train",
+  "test_split": "test",
+  "layer": 11,
+  "target_property": "log_klat",
+  "key": "XPS",
+  "mlip": "orb2",
+  "model_type": "modnet",
+  "hyperparameters": {
+    "batch_size": 64,
+    "learning_rate": 0.0011947626853013,
+    "n_features": 247,
+    "depth": 2,
+    "width": 137,
+    "loss": "mae",
+    "out_act": "linear"
+  },
+  "summary_metrics": {
+    "train_mae": 0.1600487828254699,
+    "train_r2": 0.9218612313270568,
+    "test_mae": 0.3801113665103912,
+    "test_r2": 0.7838839292526245,
+    "optuna_best_value": 0.4163729131221771,
+    "optuna_best_mae_std": 0.0181022912359798,
+    "n_trials": 38
+  },
+  "retrain_metrics": {
+    "train_mae": 0.1584496647119522,
+    "train_r2": 0.9207829833030701,
+    "test_mae": 0.3799431324005127,
+    "test_r2": 0.7680658102035522
+  },
+  "source_files": {
+    "train_bundle": "/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data/feat_orb2/random_split_dedup_w_min_freq_train_XPS_orb2.pkl",
+    "test_bundle": "/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data/feat_orb2/random_split_dedup_w_min_freq_test_XPS_orb2.pkl"
+  }
+}
