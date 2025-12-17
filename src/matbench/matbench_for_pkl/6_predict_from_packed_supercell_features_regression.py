@@ -2,6 +2,7 @@
 """
 Predict with a trained MODNet regression model using packed supercell features (.pkl.gz)
 or raw feature .npy files, with optional metadata (mp_ids, generation_id, targets).
+Convenience slug mode: pass --slug/--layers to auto-locate NPYs under benchmark_data/feat_<mlip>/npy.
 """
 
 from __future__ import annotations
@@ -17,6 +18,25 @@ import pandas as pd
 
 from modnet.models import MODNetModel
 from modnet.preprocessing import MODData
+
+
+def default_data_root() -> Path:
+    return Path(__file__).resolve().parent / "benchmark_data"
+
+
+def parse_layers(arg: Optional[str]) -> List[int]:
+    """Parse comma-separated layers; empty/None returns []."""
+    if not arg:
+        return []
+    layers: List[int] = []
+    for tok in arg.split(","):
+        tok = tok.strip()
+        if not tok:
+            continue
+        if not tok.isdigit():
+            raise ValueError(f"Invalid layer value: '{tok}'")
+        layers.append(int(tok))
+    return sorted(set(layers))
 
 
 def flatten_regression_pred(pred: np.ndarray) -> np.ndarray:
@@ -93,7 +113,6 @@ def load_mp_ids(mp_ids_path: Optional[Path], count: int) -> List[str]:
         )
     return ids
 
-
 def infer_layer_from_npy(path: Path, key: str, explicit: Optional[int]) -> int:
     """Infer layer index from CLI or filename suffix like '<slug>_..._<key>_l11.npy'."""
     if explicit is not None:
@@ -106,6 +125,115 @@ def infer_layer_from_npy(path: Path, key: str, explicit: Optional[int]) -> int:
         except ValueError:
             pass
     raise ValueError("Could not infer layer from npy filename; please pass --layer.")
+
+
+def pick_meta_split(meta_payload: Dict, split: str) -> tuple[Optional[str], Dict]:
+    """Return the meta split dict and logical split key."""
+    requested_split_key = f"X_{split}"
+    meta_split_key = requested_split_key
+    meta_split = meta_payload.get(requested_split_key)
+
+    available_splits = [
+        k for k, v in meta_payload.items() if k.startswith("X_") and isinstance(v, dict)
+    ]
+    if not isinstance(meta_split, dict):
+        if len(available_splits) == 1:
+            meta_split_key = available_splits[0]
+            meta_split = meta_payload[meta_split_key]
+        elif len(available_splits) == 0:
+            meta_split_key = None
+            meta_split = meta_payload
+        else:
+            raise KeyError(
+                f"Split '{split}' not found in meta payload."
+                f" Available splits: {available_splits or '<none>'}"
+            )
+
+    logical_meta_split = meta_split_key.split("X_", 1)[-1] if meta_split_key else None
+    return logical_meta_split, meta_split
+
+
+def resolve_meta_for_npy(
+    meta_payload: Optional[Dict],
+    split: str,
+    meta_id_key: str,
+    feature_count: int,
+) -> tuple[Optional[List[str]], Optional[List[str]], Dict]:
+    """Extract mp_ids/generation_ids/y_block from an optional meta payload."""
+    if meta_payload is None:
+        return None, None, {}
+
+    logical_meta_split, meta_split = pick_meta_split(meta_payload, split)
+    meta_id_key = (meta_id_key or "mp_ids").strip() or "mp_ids"
+    meta_mp_ids = meta_split.get(meta_id_key)
+    if meta_mp_ids is None and meta_id_key != "mp_ids":
+        meta_mp_ids = meta_split.get("mp_ids")
+    if meta_mp_ids is not None:
+        if len(meta_mp_ids) != feature_count:
+            raise ValueError(
+                f"meta mp_ids length mismatch: {len(meta_mp_ids)} vs {feature_count} feature rows "
+                f"(split={split})"
+            )
+        meta_mp_ids = [str(mpid) for mpid in meta_mp_ids]
+
+    gen_ids_raw = None
+    if "generation_id" in meta_split:
+        gen_ids_raw = meta_split.get("generation_id")
+    elif "generation_ids" in meta_split:
+        gen_ids_raw = meta_split.get("generation_ids")
+    generation_ids = None
+    if gen_ids_raw is not None:
+        if len(gen_ids_raw) != feature_count:
+            raise ValueError(
+                f"generation_id length mismatch in meta: {len(gen_ids_raw)} vs {feature_count} feature rows "
+                f"(split={split})"
+            )
+        generation_ids = [str(gid) for gid in gen_ids_raw]
+
+    if logical_meta_split:
+        y_split_key = f"Y_{logical_meta_split}"
+        y_block = meta_payload.get(y_split_key, {})
+    else:
+        y_candidates = [
+            k for k, v in meta_payload.items() if k.startswith("Y_") and isinstance(v, dict)
+        ]
+        y_block = meta_payload.get(y_candidates[0], {}) if len(y_candidates) == 1 else {}
+
+    return meta_mp_ids, generation_ids, y_block
+
+
+def prepare_from_npy(
+    npy_path: Path,
+    key: str,
+    split: str,
+    layer_override: Optional[int],
+    target_name_override: Optional[str],
+    mp_ids_path: Optional[Path],
+    meta_payload: Optional[Dict],
+    meta_id_key: str,
+) -> tuple[np.ndarray, List[str], Optional[List[str]], Dict, Path, str, int, str]:
+    """Load npy features and accompanying metadata/y_block."""
+    if not npy_path.exists():
+        raise FileNotFoundError(f"Feature .npy not found: {npy_path}")
+    layer = infer_layer_from_npy(npy_path, key, layer_override)
+    X = np.load(npy_path)
+    target_name = target_name_override
+    if target_name is None and meta_payload is not None:
+        target_name = infer_target_name(meta_payload, target_name)
+    target_name = target_name or "g"
+
+    meta_mp_ids, generation_ids, y_block = resolve_meta_for_npy(
+        meta_payload, split, meta_id_key, len(X)
+    )
+    mp_ids = (
+        meta_mp_ids
+        if meta_mp_ids is not None and mp_ids_path is None
+        else load_mp_ids(mp_ids_path, len(X))
+    )
+
+    default_out = npy_path.with_name(npy_path.stem + f"_pred_l{layer}.csv")
+    mode_desc = f"npy ({npy_path.name})"
+    return X, mp_ids, generation_ids, y_block, default_out, mode_desc, layer, target_name
 
 
 def main() -> None:
@@ -128,6 +256,29 @@ def main() -> None:
         "--npy",
         type=Path,
         help="Raw feature .npy (e.g., *_all_XPS_l11.npy) to predict without packing.",
+    )
+    source_group.add_argument(
+        "--slug",
+        help=(
+            "Dataset slug to auto-locate npy features under <data-root>/feat_<mlip>/npy/"
+            "<slug>_all_<key>_l<layer>.npy. Requires --layers/--layer."
+        ),
+    )
+    parser.add_argument(
+        "--layers",
+        default=None,
+        help="Comma-separated list of layers to predict (only used with --slug).",
+    )
+    parser.add_argument(
+        "--data-root",
+        type=Path,
+        default=default_data_root(),
+        help="Benchmark data root (defaults to ./benchmark_data next to this script).",
+    )
+    parser.add_argument(
+        "--mlip",
+        default="orb2",
+        help="MLIP tag used for directory naming in slug mode (default: orb2).",
     )
     parser.add_argument(
         "--meta-pickle",
@@ -167,8 +318,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--meta-id-key",
-        default="mp_ids",
-        help="Key name inside meta pickle to read ids from (default: mp_ids).",
+        default="ids",
+        help="Key name inside meta pickle to read ids from (default: ids).",
     )
     parser.add_argument(
         "--id-column",
@@ -181,22 +332,100 @@ def main() -> None:
         default=None,
         help="Optional CSV path for predictions (defaults next to features file).",
     )
+    parser.add_argument(
+        "--prediction-column",
+        default="prediction",
+        help="Column name for predicted values (default: prediction).",
+    )
+    parser.add_argument(
+        "--skip-target",
+        action="store_true",
+        help="Do not attach ground-truth targets even if available.",
+    )
+    parser.add_argument(
+        "--skip-generation",
+        action="store_true",
+        help="Do not attach generation_id even if available.",
+    )
     args = parser.parse_args()
 
     model_path = args.model.resolve()
+    data_root = args.data_root.resolve()
+    layer_list = parse_layers(args.layers)
+    if args.layer is not None and not layer_list:
+        layer_list = [args.layer]
+
+    if args.slug and (args.features or args.npy):
+        raise ValueError("--slug cannot be combined with --features/--npy.")
+    if args.slug and not layer_list:
+        raise ValueError("Provide at least one layer via --layers/--layer when using --slug.")
+    if not args.slug and not args.features and not args.npy:
+        raise ValueError("Provide one of --features, --npy, or --slug.")
 
     payload_meta: Optional[Dict] = None
+    meta_path: Optional[Path] = None
     if args.meta_pickle is not None:
         meta_path = args.meta_pickle.resolve()
         if not meta_path.exists():
             raise FileNotFoundError(f"Meta pickle not found: {meta_path}")
         payload_meta = read_pickle(meta_path)
 
-    if args.features is not None:
+    jobs: List[Dict] = []
+    if args.slug:
+        # Infer npy + meta paths from slug/data-root/mlip.
+        if not data_root.exists():
+            raise FileNotFoundError(f"Data root not found: {data_root}")
+        feat_dir = data_root / f"feat_{args.mlip}" / "npy"
+        feat_dir.mkdir(parents=True, exist_ok=True)
+
+        # Auto-load meta if user did not provide one and a default exists.
+        if meta_path is None:
+            candidate_meta = data_root / "metadata" / f"{args.slug}_meta.pkl"
+            if candidate_meta.exists():
+                meta_path = candidate_meta
+                payload_meta = read_pickle(candidate_meta)
+            else:
+                print(
+                    f"[INFO] Meta pickle not provided and default missing: {candidate_meta}. "
+                    "Proceeding without meta."
+                )
+
+        print(
+            f"[INFO] Using slug mode: slug={args.slug} | layers={layer_list} | mlip={args.mlip} | "
+            f"data_root={data_root}"
+        )
+        for lyr in layer_list:
+            npy_path = feat_dir / f"{args.slug}_all_{args.key}_l{lyr}.npy"
+            jobs.append(
+                {
+                    "mode": "npy",
+                    "path": npy_path,
+                    "layer_override": lyr,
+                    "payload_meta": payload_meta,
+                }
+            )
+    elif args.npy is not None:
+        npy_path = args.npy.resolve()
+        jobs.append(
+            {
+                "mode": "npy",
+                "path": npy_path,
+                "layer_override": layer_list[0] if layer_list else args.layer,
+                "payload_meta": payload_meta,
+            }
+        )
+    else:
         feature_path = args.features.resolve()
         # Allow a .npy to be passed via --features for convenience.
         if feature_path.suffix in {".npy", ".npz"}:
-            args.npy = feature_path
+            jobs.append(
+                {
+                    "mode": "npy",
+                    "path": feature_path,
+                    "layer_override": layer_list[0] if layer_list else args.layer,
+                    "payload_meta": payload_meta,
+                }
+            )
         else:
             try:
                 payload = read_pickle(feature_path)
@@ -205,154 +434,123 @@ def main() -> None:
                     f"Failed to load feature pickle '{feature_path}'. "
                     "If this is a .npy, pass it via --npy."
                 ) from exc
-
-    generation_ids: Optional[List[str]] = None
-
-    if args.npy is not None:
-        npy_path = args.npy.resolve()
-        if not npy_path.exists():
-            raise FileNotFoundError(f"Feature .npy not found: {npy_path}")
-        layer = infer_layer_from_npy(npy_path, args.key, args.layer)
-        X = np.load(npy_path)
-        target_name = args.target_name
-        if target_name is None and payload_meta is not None:
-            target_name = infer_target_name(payload_meta, target_name)
-        target_name = target_name or "g"
-
-        mp_ids = load_mp_ids(args.mp_ids_path, len(X))
-        y_block: Dict = {}
-        if payload_meta is not None:
-            requested_split_key = f"X_{args.split}"
-            meta_split_key = requested_split_key
-            meta_split = payload_meta.get(requested_split_key)
-
-            available_splits = [
-                k for k, v in payload_meta.items() if k.startswith("X_") and isinstance(v, dict)
-            ]
-            if not isinstance(meta_split, dict):
-                if len(available_splits) == 1:
-                    meta_split_key = available_splits[0]
-                    meta_split = payload_meta[meta_split_key]
-                elif len(available_splits) == 0:
-                    meta_split_key = None
-                    meta_split = payload_meta
-                else:
-                    raise KeyError(
-                        f"Split '{args.split}' not found in meta pickle."
-                        f" Available splits: {available_splits or '<none>'}"
-                    )
-
-            logical_meta_split = meta_split_key.split("X_", 1)[-1] if meta_split_key else None
-            meta_id_key = (args.meta_id_key or "mp_ids").strip() or "mp_ids"
-            meta_mp_ids = meta_split.get(meta_id_key)
-            if meta_mp_ids is None and meta_id_key != "mp_ids":
-                meta_mp_ids = meta_split.get("mp_ids")
-            if meta_mp_ids is not None and args.mp_ids_path is None:
-                if len(meta_mp_ids) != len(X):
-                    raise ValueError(
-                        f"meta mp_ids length mismatch: {len(meta_mp_ids)} vs {len(X)} feature rows "
-                        f"(split={args.split})"
-                    )
-                mp_ids = [str(mpid) for mpid in meta_mp_ids]
-
-            gen_ids_raw = None
-            if "generation_id" in meta_split:
-                gen_ids_raw = meta_split.get("generation_id")
-            elif "generation_ids" in meta_split:
-                gen_ids_raw = meta_split.get("generation_ids")
-            if gen_ids_raw is not None:
-                if len(gen_ids_raw) != len(X):
-                    raise ValueError(
-                        f"generation_id length mismatch in meta: {len(gen_ids_raw)} vs {len(X)} feature rows "
-                        f"(split={args.split})"
-                    )
-                generation_ids = [str(gid) for gid in gen_ids_raw]
-
-            if logical_meta_split:
-                y_split_key = f"Y_{logical_meta_split}"
-                y_block = payload_meta.get(y_split_key, {})
-            else:
-                y_candidates = [
-                    k for k, v in payload_meta.items() if k.startswith("Y_") and isinstance(v, dict)
-                ]
-                if len(y_candidates) == 1:
-                    y_block = payload_meta[y_candidates[0]]
-
-        default_out = npy_path.with_name(npy_path.stem + f"_pred_l{layer}.csv")
-        mode_desc = f"npy ({npy_path.name})"
-    else:
-        payload = read_pickle(feature_path)  # type: ignore[arg-type]
-        target_name = infer_target_name(payload, args.target_name)
-        layer = infer_layer(payload, args.key, args.layer)
-
-        split_key = f"X_{args.split}"
-        if split_key not in payload or not isinstance(payload[split_key], dict):
-            raise KeyError(f"Split '{args.split}' not found in {feature_path.name}.")
-
-        split_block = payload[split_key]
-        feat_key = f"{args.key}_l{layer}"
-        if feat_key not in split_block:
-            raise KeyError(
-                f"Feature key '{feat_key}' missing in split '{args.split}'. "
-                f"Available keys: {list(split_block.keys())}"
+            jobs.append(
+                {
+                    "mode": "features",
+                    "path": feature_path,
+                    "payload": payload,
+                    "layer_override": layer_list[0] if layer_list else args.layer,
+                }
             )
 
-        X = np.asarray(split_block[feat_key], dtype=np.float32)
-        mp_ids: List[str] = [str(mpid) for mpid in split_block.get("mp_ids", range(len(X)))]
-        gen_ids_raw = None
-        if "generation_id" in split_block:
-            gen_ids_raw = split_block.get("generation_id")
-        elif "generation_ids" in split_block:
-            gen_ids_raw = split_block.get("generation_ids")
-        if gen_ids_raw is not None:
-            if len(gen_ids_raw) != len(X):
-                raise ValueError(
-                    f"generation_id length mismatch: {len(gen_ids_raw)} vs {len(X)} feature rows "
-                    f"(split={args.split}, layer={layer})"
-                )
-            generation_ids = [str(gid) for gid in gen_ids_raw]
-        y_split_key = f"Y_{args.split}"
-        y_block = payload.get(y_split_key, {})
-        default_out = feature_path.with_name(
-            feature_path.stem + f"_pred_split-{args.split}_l{layer}.csv"
-        )
-        mode_desc = f"packed pickle ({feature_path.name})"
-
     model = load_model(model_path)
-    md = build_moddata(X, target_name=target_name)
-
-    raw_pred = model.predict(md, remap_out_of_bounds=False)
-    pred_values = flatten_regression_pred(raw_pred)
-
     id_column = (args.id_column or "mp_id").strip()
     if not id_column:
         raise ValueError("id column name cannot be empty.")
+    pred_column = (args.prediction_column or "prediction").strip()
+    if not pred_column:
+        raise ValueError("prediction column name cannot be empty.")
 
-    output_payload = {id_column: mp_ids}
-    if generation_ids is not None:
-        output_payload["generation_id"] = generation_ids
-    output_payload["prediction"] = pred_values
-    output = pd.DataFrame(output_payload)
+    for job in jobs:
+        generation_ids: Optional[List[str]] = None
+        if job["mode"] == "npy":
+            (
+                X,
+                mp_ids,
+                generation_ids,
+                y_block,
+                default_out,
+                mode_desc,
+                layer,
+                target_name,
+            ) = prepare_from_npy(
+                job["path"],
+                args.key,
+                args.split,
+                job.get("layer_override"),
+                args.target_name,
+                args.mp_ids_path,
+                job.get("payload_meta"),
+                args.meta_id_key,
+            )
+        else:
+            payload = job["payload"]
+            target_name = infer_target_name(payload, args.target_name)
+            layer = infer_layer(payload, args.key, job.get("layer_override"))
 
-    # Attach ground truth if present.
-    if isinstance(y_block, dict):
-        if target_name in y_block:
-            output["target"] = y_block[target_name]
-        elif len(y_block) == 1:
-            only_key = next(iter(y_block.keys()))
-            output["target"] = y_block[only_key]
+            split_key = f"X_{args.split}"
+            if split_key not in payload or not isinstance(payload[split_key], dict):
+                raise KeyError(f"Split '{args.split}' not found in {job['path'].name}.")
 
-    out_path = args.output.resolve() if args.output is not None else default_out
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    output.to_csv(out_path, index=False)
+            split_block = payload[split_key]
+            feat_key = f"{args.key}_l{layer}"
+            if feat_key not in split_block:
+                raise KeyError(
+                    f"Feature key '{feat_key}' missing in split '{args.split}'. "
+                    f"Available keys: {list(split_block.keys())}"
+                )
 
-    print(f"[INFO] Model:   {model_path}")
-    print(f"[INFO] Source:  {mode_desc}")
-    print(f"[INFO] Split:   {args.split} | Layer: {layer} | Key: {args.key}")
-    print(f"[INFO] ID column: {id_column}")
-    if payload_meta is not None:
-        print(f"[INFO] Meta id key: {(args.meta_id_key or 'mp_ids').strip() or 'mp_ids'}")
-    print(f"[INFO] Saved predictions: {out_path} ({len(output)} rows)")
+            X = np.asarray(split_block[feat_key], dtype=np.float32)
+            mp_ids = [str(mpid) for mpid in split_block.get("mp_ids", range(len(X)))]
+            gen_ids_raw = None
+            if "generation_id" in split_block:
+                gen_ids_raw = split_block.get("generation_id")
+            elif "generation_ids" in split_block:
+                gen_ids_raw = split_block.get("generation_ids")
+            if gen_ids_raw is not None:
+                if len(gen_ids_raw) != len(X):
+                    raise ValueError(
+                        f"generation_id length mismatch: {len(gen_ids_raw)} vs {len(X)} feature rows "
+                        f"(split={args.split}, layer={layer})"
+                    )
+                generation_ids = [str(gid) for gid in gen_ids_raw]
+            y_split_key = f"Y_{args.split}"
+            y_block = payload.get(y_split_key, {})
+            default_out = job["path"].with_name(
+                job["path"].stem + f"_pred_split-{args.split}_l{layer}.csv"
+            )
+            mode_desc = f"packed pickle ({job['path'].name})"
+
+        md = build_moddata(X, target_name=target_name)
+        raw_pred = model.predict(md, remap_out_of_bounds=False)
+        pred_values = flatten_regression_pred(raw_pred)
+
+        output_payload = {id_column: mp_ids}
+        if (not args.skip_generation) and generation_ids is not None:
+            output_payload["generation_id"] = generation_ids
+        output_payload[pred_column] = pred_values
+        output = pd.DataFrame(output_payload)
+
+        # Attach ground truth if present.
+        if (not args.skip_target) and isinstance(y_block, dict):
+            if target_name in y_block:
+                output["target"] = y_block[target_name]
+            elif len(y_block) == 1:
+                only_key = next(iter(y_block.keys()))
+                output["target"] = y_block[only_key]
+
+        # Ensure column order: id, generation_id (if present), prediction, target (if present).
+        ordered_cols = [c for c in [id_column, "generation_id", pred_column, "target"] if c in output.columns]
+        output = output.loc[:, ordered_cols]
+
+        out_path = args.output.resolve() if args.output is not None else default_out
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        output.to_csv(out_path, index=False)
+
+        print(f"[INFO] Model:   {model_path}")
+        if args.slug:
+            print(f"[INFO] Data root: {data_root} | slug: {args.slug} | mlip: {args.mlip}")
+        if meta_path is not None:
+            print(f"[INFO] Meta pickle: {meta_path}")
+        print(f"[INFO] Source:  {mode_desc}")
+        print(f"[INFO] Split:   {args.split} | Layer: {layer} | Key: {args.key}")
+        print(
+            f"[INFO] ID column: {id_column} | Prediction column: {pred_column} "
+            f"| Attach generation: {not args.skip_generation} | Attach target: {not args.skip_target}"
+        )
+        if meta_path is not None:
+            print(f"[INFO] Meta id key: {(args.meta_id_key or 'mp_ids').strip() or 'mp_ids'}")
+        print(f"[INFO] Saved predictions: {out_path} ({len(output)} rows)")
 
 
 if __name__ == "__main__":
