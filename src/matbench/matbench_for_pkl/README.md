@@ -152,7 +152,12 @@ The same supercell/feature generation steps (1 and 2) apply; ensure your target 
   ```
   Use `4_4_opt_hp_modnet_from_supercells_binary_with_preds.py` if you want train/test prediction CSVs (prob_0/prob_1/pred_label) alongside the Optuna study.
 
-## Predicting on arbitrary datasets
+## Predicting on Arbitrary Datasets
+
+For end-to-end batch processing (from feature construction to prediction) on arbitrary datasets, please refer to the following job script:
+  `job_build_featurize_predict_sc_arbital.sh`
+This script provides a complete workflow for building supercells, featurizing the structures, and running predictions in a single job.
+
 For inference-only CIF tables:
 
 1) Build supercells from a CSV/pickle with a `cif` column:  
