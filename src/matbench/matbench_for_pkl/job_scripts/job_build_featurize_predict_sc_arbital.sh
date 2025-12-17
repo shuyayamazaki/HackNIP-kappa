@@ -40,7 +40,7 @@ ID_COLUMN="immutable_id"
 TARGET_LENGTH="10.0"
 DATASET_SLUG="lemat_bulk_csx_batch1"
 DATA_ROOT="/work/y-tomiya/ntu/HackNIP_master/HackNIP/benchmark_data"
-OUTPUT_STRUCT_DIR="${DATA_ROOT}/structures"
+OUTPUT_STRUCT_DIR="${DATA_ROOT}/"
 SKIP_BASE_TRAJ=""   # set to "--skip-base-traj" to skip writing *_XP.traj
 
 # Stage 2: featurize supercells
