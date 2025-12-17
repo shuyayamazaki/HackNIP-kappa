@@ -155,7 +155,7 @@ The same supercell/feature generation steps (1 and 2) apply; ensure your target 
 ## Predicting on Arbitrary Datasets
 
 For end-to-end batch processing (from feature construction to prediction) on arbitrary datasets, please refer to the following job script:
-  `job_build_featurize_predict_sc_arbital.sh`
+  `job_scripts/job_build_featurize_predict_sc_arbital.sh`
 This script provides a complete workflow for building supercells, featurizing the structures, and running predictions in a single job.
 
 For inference-only CIF tables:
